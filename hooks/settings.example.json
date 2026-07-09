@@ -1,0 +1,27 @@
+{
+  "//": "Claude Code hook wiring for prove-it. Merge into .claude/settings.json in your repo, or ~/.claude/settings.json for every repo. Replace /path/to/prove-it with where you cloned it.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /path/to/prove-it/hooks/mark-session-write.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /path/to/prove-it/hooks/prove-it.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}
