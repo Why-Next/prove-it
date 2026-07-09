@@ -85,6 +85,37 @@ def check_hooks(errors: list[str]) -> None:
                         f"not a path relative to the user's cwd: {command}")
 
 
+def check_commands(errors: list[str]) -> None:
+    """Slash commands are discovered by filename, so a typo is a silent no-op."""
+    commands = ROOT / "commands"
+    if not commands.is_dir():
+        errors.append("commands/ is missing")
+        return
+
+    found = sorted(p.name for p in commands.glob("*.md"))
+    expected = ["init.md", "ledger.md"]
+    if found != expected:
+        errors.append(f"commands/ holds {found}, expected {expected}")
+
+    for path in commands.glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            errors.append(f"commands/{path.name}: no YAML frontmatter")
+            continue
+        front = text.split("---\n", 2)[1]
+        if "description:" not in front:
+            errors.append(f"commands/{path.name}: frontmatter has no description")
+        # The README advertises these names; a rename breaks the docs silently.
+        if f"/prove-it:{path.stem}" not in text:
+            errors.append(
+                f"commands/{path.name}: body never names /prove-it:{path.stem}")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for path in commands.glob("*.md"):
+        if f"/prove-it:{path.stem}" not in readme:
+            errors.append(f"README.md never mentions /prove-it:{path.stem}")
+
+
 def check_versions(errors: list[str]) -> None:
     plugin = load(PLUGIN, errors)
     if not plugin:
@@ -116,6 +147,7 @@ def main() -> int:
     errors: list[str] = []
     check_marketplace(errors)
     check_hooks(errors)
+    check_commands(errors)
     check_versions(errors)
     run_official_validator(errors)
 

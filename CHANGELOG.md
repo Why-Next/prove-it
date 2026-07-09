@@ -22,14 +22,18 @@ one deliberate limitation stated in plain sight.
   `verify.sh` at the repo root and blocks the turn on non-zero exit. Skips
   read-only sessions, clean trees, and tree states that already passed.
   Bypass with `PROVE_IT_SKIP=1`.
-- **Claude Code plugin** (`/plugin install prove-it@whynext`). The hooks are
-  plain bash and remain usable without it.
+- **Claude Code plugin** (`/plugin install prove-it@whynext`), with two commands.
+  `/prove-it:init` writes a first `verify.sh` and makes the user watch it fail
+  once. `/prove-it:ledger` reads back what the gate has caught. The hooks are
+  plain bash and remain usable without the plugin.
 - **The ledger** (`PROVE_IT_LEDGER=1`). One JSON line per caught false
   completion, holding what the agent claimed, what was demanded, and what was
   true. Local disk only, never transmitted, off by default.
 - **Recipes** for Node, Python, Go, and Flutter.
-- **README in eleven languages**, held to the English original by
-  `scripts/check_i18n.py`.
+- **Every document in eleven languages.** README, SPEC, CONTRIBUTING, SECURITY,
+  and CODE_OF_CONDUCT, held to their English originals by
+  `scripts/check_i18n.py`. The English SPEC is normative, and each translation
+  says so and links back to it.
 
 ### Security
 

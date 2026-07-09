@@ -17,22 +17,24 @@ Deutsch ·
 [Español](README.es.md) ·
 [한국어](README.ko.md)
 
-**Dein Agent kann seinen Zug nicht beenden, bis dein Repo sich selbst beweist.**
+Dein Agent kann seinen Zug nicht beenden, bis dein Repository sich selbst beweist.
 
-Coding-Agenten sagen "Tests bestehen", ohne sie ausgeführt zu haben, und
-"behoben", ohne den Fehler je reproduziert zu haben. Nicht aus Bosheit: Ein
-Agent kann nicht unterscheiden, was er getan hat, von dem, was er tun wollte -
-also meldet er die Absicht.
+Coding-Agenten melden, dass die Tests bestehen, obwohl sie sie nie ausgeführt
+haben, und dass ein Fehler behoben ist, obwohl sie ihn nie reproduziert haben.
+Der Agent hat keine Möglichkeit, das Getane mit dem Beabsichtigten zu
+vergleichen, also meldet er die Absicht. Das ist eine Eigenschaft der Bauart,
+kein Charakterfehler, und kein Prompt behebt es.
 
-`prove-it` macht aus *fertig* etwas, das ein Agent bestehen muss, nicht etwas,
-das er einfach behaupten darf. Leg ein `verify.sh` in das Wurzelverzeichnis
-deines Repos. Wenn der Agent aufhören will, führt das Gate es aus. Exit-Code
-ungleich null, und der Zug endet nicht.
+`prove-it` macht aus der Meldung eine Prüfung. Leg ein `verify.sh` in das
+Wurzelverzeichnis deines Repositorys. Wenn der Agent seinen Zug beenden will,
+führt ein Hook das Skript aus, und ein Exit-Code ungleich null hält den Zug
+offen, bis die Ursache behoben ist.
 
 ![prove-it blockiert einen Agenten, der behauptet, fertig zu sein](../../docs/demo.svg)
 
-Etwa in der Hälfte der Fälle antwortet ein Agent, den man um Beweise bittet, mit
-"du hast recht, es ist noch nicht fertig."
+In meiner eigenen Nutzung kommt knapp die Hälfte der Züge, die auf ein
+fehlschlagendes Gate treffen, damit zurück, dass der Agent einräumt, noch nicht
+fertig zu sein. Diese Züge hätten sonst mit dem Wort "fertig" geendet.
 
 ## Installation
 
@@ -43,24 +45,25 @@ Als Claude Code Plugin:
 /plugin install prove-it@whynext
 ```
 
-Das ist die gesamte Installation. Das Plugin registriert zwei Hooks: einer
-markiert, dass eine Sitzung Dateien bearbeitet hat, einer gated den Zug.
+Das Plugin registriert zwei Hooks - einen, der markiert, dass eine Sitzung
+Dateien bearbeitet hat, und einen, der den Zug gated - und fügt zwei Kommandos
+hinzu: `/prove-it:init` schreibt dein erstes `verify.sh`, und
+`/prove-it:ledger` liest zurück, was das Gate erwischt hat.
 
-Für jeden anderen Agenten, oder wenn du lieber kein Plugin installieren
-möchtest, klone das Repo und verdrahte dieselben zwei Hooks selbst. Sie sind
-reines bash und hängen von nichts ab außer `bash`, `git` und `python3`:
+Für jeden anderen Agenten klone das Repository und verdrahte dieselben zwei
+Hooks. Sie sind reines bash und brauchen nur `bash`, `git` und `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
 ```
 
 Füge [`hooks/settings.example.json`](../../hooks/settings.example.json) in deine
-`.claude/settings.json` (pro Repo) oder `~/.claude/settings.json` (überall) ein.
-Das Gate liest eine Stop-hook-JSON-Nutzlast von stdin und kommuniziert über den
-Exit-Code, sodass alles, was am Ende eines Zuges ein Skript ausführen kann, es
-antreiben kann.
+`.claude/settings.json` für ein einzelnes Repository ein, oder in
+`~/.claude/settings.json` für alle. Das Gate liest eine Stop-hook-JSON-Nutzlast
+von stdin und antwortet mit einem Exit-Code, sodass alles, was am Ende eines
+Zuges ein Skript ausführen kann, es antreiben kann.
 
-Dann schreib die einzige Datei, die zählt:
+Dann schreib die Datei, auf die es ankommt:
 
 ```bash
 cat > verify.sh <<'EOF'
@@ -77,95 +80,97 @@ EOF
 chmod +x verify.sh
 ```
 
-Bis du diese Datei schreibst, tut das Gate gar nichts.
+Solange diese Datei nicht existiert, tut das Gate gar nichts.
 
 ## Deine ersten fünf Minuten
 
-Fang kleiner an, als du denkst. Ein `verify.sh`, das nur `git diff --check`
-ausführt, ist schon etwas wert, und es wird bestehen - was dir zeigt, dass das
-Gate still ist, wenn alles in Ordnung ist.
+Fang kleiner an, als du möchtest. Ein `verify.sh`, das nur `git diff --check`
+ausführt, ist es schon wert, und es besteht, was dir zeigt, dass das Gate still
+bleibt, wenn das Repository in gutem Zustand ist.
 
 ```bash
 printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
 chmod +x verify.sh
-./verify.sh                 # run it yourself first. Never ship a check you have not seen pass.
+./verify.sh                 # run it yourself first
 ```
 
-Jetzt lass es absichtlich fehlschlagen, damit du weißt, dass das Gate echt ist:
+Jetzt lass es absichtlich fehlschlagen:
 
 ```bash
 sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
 ```
 
-Bitte deinen Agenten, irgendeine Datei zu bearbeiten, und lass ihn dann fertig
-werden. Er wird versuchen, seinen Zug zu beenden, das Gate wird `verify.sh`
-ausführen, und der Zug wird blockiert. Mach das `exit 1` rückgängig, und
-derselbe Agent kommt problemlos durch.
+Bitte den Agenten, irgendeine Datei zu bearbeiten, und lass ihn fertig werden.
+Er wird versuchen, den Zug zu beenden, das Gate wird `verify.sh` ausführen, und
+der Zug bleibt offen. Entfern das `exit 1`, und derselbe Agent kommt problemlos
+durch. Liefere nie einen Check aus, den du nicht hast fehlschlagen sehen.
 
 Von da an füge einen echten Check nach dem anderen hinzu: das Test-Kommando, das
-du tatsächlich ausführst, dann den Typ-Checker, dann die Diff-Hygiene. Jeder
-Check, den du hinzufügst, ist ein Satz in deiner Antwort auf *was bedeutet hier
-bewiesen*. Hör auf, wenn das Ganze etwa eine Minute dauert.
+du wirklich ausführst, dann den Typ-Checker, dann die Diff-Hygiene. Jeder Check,
+den du hinzufügst, ist ein Satz in deiner Antwort auf die Frage, was "bewiesen"
+in diesem Repository bedeutet. Hör auf, wenn das ganze Skript etwa eine Minute
+dauert.
 
-Der Fehler, den es zu vermeiden gilt, ist, am ersten Tag ein ehrgeiziges
-`verify.sh` zu schreiben. Ein langsames oder flackerndes Gate wird innerhalb
-einer Woche umgangen, und ein umgangenes Gate ist schlimmer als keines: Es sagt
-dir, dass ein Check stattgefunden hat, obwohl das nicht der Fall war.
+Der häufige Fehler ist, am ersten Tag ein ehrgeiziges `verify.sh` zu schreiben.
+Ein Gate, das langsam oder flackerig ist, wird binnen einer Woche umgangen, und
+ein umgangenes Gate ist schlimmer als gar keines, weil es meldet, dass ein Check
+lief, obwohl nichts lief.
 
 ## Wie es entscheidet, ob es läuft
 
-Das Gate ist standardmäßig still. Es führt `verify.sh` nur aus, wenn jede dieser
-Bedingungen erfüllt ist:
+Das Gate bleibt still, außer all dies trifft zu:
 
-- die Sitzung hat tatsächlich Dateien bearbeitet (eine reine Lese-Sitzung hat nichts zu beweisen)
-- ein ausführbares `verify.sh` existiert im Wurzelverzeichnis des Repos
+- diese Sitzung hat Dateien in diesem Repository bearbeitet
+- ein ausführbares `verify.sh` existiert im Wurzelverzeichnis des Repositorys
 - der Arbeitsbaum hat nicht committete Änderungen
 - genau dieser Baumzustand hat noch nicht bestanden
 
-Letzteres bedeutet, dass ein bestehender Baum einmal verifiziert wird, nicht bei
-jedem Stopp. Fehlschläge geben die letzten 20 Zeilen der Ausgabe an den Agenten
-aus, was meist ausreicht, damit er die Ursache behebt, ohne dass man es ihm
-sagen muss.
+Die letzte Bedingung bedeutet, dass ein bestehender Baum einmal verifiziert wird
+statt bei jedem Stopp. Wenn die Verifikation fehlschlägt, sieht der Agent die
+letzten zwanzig Zeilen der Ausgabe, was meist ausreicht, damit er die Ursache
+behebt, ohne dass man ihm sagt, was schiefging.
 
-Um das Gate absichtlich zu passieren: `PROVE_IT_SKIP=1`. Um es dauerhaft
-abzuschalten: lösch `verify.sh`. Beides ist bewusst so. Ein Gate, das niemand
-entfernen kann, ist ein Gate, um das die Leute herum routen.
+`PROVE_IT_SKIP=1` kommt absichtlich am Gate vorbei. `verify.sh` zu löschen
+schaltet es dauerhaft ab. Beide Notausgänge sind bewusst so: Menschen routen um
+ein Gate herum, das sie nicht entfernen können.
 
-## Der Ausstieg ist das Feature
+## Wenn der Agent das Gate bearbeitet
 
-Der härteste Fehlermodus ist kein flackernder Check. Es ist ein Agent, der
-`verify.sh` nicht bestehen kann und stattdessen still `verify.sh` bearbeitet. Die
-Fehlermeldung des Gates sagt das mit klaren Worten, und die Spec macht es zu
-einer erklärten Verletzung. Achte trotzdem in deinen Diffs darauf. Genau dafür
-ist der Diff-Beweis da.
+Der härteste Fehlermodus ist kein flackeriger Check. Es ist ein Agent, der
+`verify.sh` nicht bestehen kann und stattdessen `verify.sh` bearbeitet. Die
+Fehlermeldung sagt ihm, dass er das nicht tun soll, und
+[SPEC.md](../../SPEC.md) nennt es eine Verletzung statt einer Behebung, aber
+keines von beidem ist Durchsetzung. Lies deine Diffs. Genau dafür ist der
+Diff-Beweis in der Spec da.
 
 ## Die `verify.sh`-Konvention
 
-Das Skript in `hooks/` ist absichtlich klein. Das eigentliche Artefakt ist die
-Konvention, die es umsetzt, festgehalten in **[SPEC.md](../../SPEC.md)**: Ein
-Repository erklärt, wie es sich selbst beweist, an einem bekannten Ort, mit einem
-bekannten Vertrag, und ein Agent darf keine Fertigstellung behaupten, bis dieser
-Beweis besteht.
-
-Das Plugin ist ein Vertriebskanal, nicht die Idee. Die Konvention soll jeden
-einzelnen Agenten überdauern, deshalb benennt die Spec eine Datei und einen
-Exit-Code, niemals einen Anbieter.
+Das Skript in `hooks/` ist absichtlich klein. Was es umsetzt, ist in
+[SPEC.md](../../SPEC.md) festgehalten: Ein Repository erklärt, wie es sich selbst
+beweist, an einem bekannten Pfad, mit einem bekannten Vertrag, und ein Agent
+darf keine Fertigstellung behaupten, bis dieser Beweis besteht. Die Spec benennt
+eine Datei und einen Exit-Code und nie einen Anbieter, sodass das Plugin ein Weg
+ist, die Idee zu verbreiten, nicht die Idee selbst.
 
 Lies die Spec für die vier Arten von Beweisen, gegen die ein `verify.sh` prüfen
-sollte - Kommando-Ausgabe, Diff, Reproduktion, Gegenprüfung - und für die
+sollte - Kommando-Ausgabe, Diff, Reproduktion und Gegenprüfung - und für die
 Konformitätsstufen.
 
-**Eine ehrliche Anmerkung vorweg.** Dieses Werkzeug erzwingt genau eine Sache:
-dass `verify.sh` null zurückgegeben hat, bevor der Zug endete. Ob diese Null
-etwas *bedeutet*, hängt vollständig von den Checks ab, die du geschrieben hast.
-Ein `verify.sh`, das nur `exit 0` enthält, besteht dieses Gate und beweist
-nichts. Das Werkzeug ist Level 1. Der Beweis ist Level 2, und Level 2 ist eine
-Praxis, kein Feature.
+## Was das nicht tut
+
+Das Gate erzwingt eine Sache: dass `verify.sh` null zurückgegeben hat, bevor der
+Zug endete. Ob diese Null etwas bedeutet, hängt vollständig von den Checks ab,
+die du geschrieben hast. Ein `verify.sh`, das nur `exit 0` enthält, besteht
+dieses Gate und beweist nichts.
+
+Die Spec nennt das Level 1. Level 2 ist die Frage, ob deine Checks gegen echte
+Beweise prüfen, und kein Werkzeug kann das für dich verifizieren, dieses
+eingeschlossen.
 
 ## Rezepte
 
-Ausgangspunkte pro Stack, in [`recipes/`](../../recipes/). Kopier eines nach
-`verify.sh` und streich, was nicht zutrifft. Halt es unter einer Minute;
+Ausgangspunkte pro Stack liegen in [`recipes/`](../../recipes/). Kopier eines
+nach `verify.sh` und streich, was nicht zutrifft. Halt es unter einer Minute;
 langsame Checks gehören in CI.
 
 | | |
@@ -175,8 +180,9 @@ langsame Checks gehören in CI.
 | [`go.sh`](../../recipes/go.sh) | go test, vet, gofmt check |
 | [`flutter.sh`](../../recipes/flutter.sh) | analyze, test, format check |
 
-Der schwere Teil bei der Einführung ist nie das Verdrahten des Hooks. Es ist,
-zum ersten Mal "was bedeutet *bewiesen* in diesem Repo" zu beantworten.
+Das Verdrahten des Hooks ist der leichte Teil. Die Arbeit ist, zu beantworten,
+was "bewiesen" in deinem Repository bedeutet, und kein Rezept beantwortet das
+für dich.
 
 ## Das Ledger
 
@@ -188,29 +194,34 @@ Zeile an `~/.prove-it/ledger.jsonl` an:
  "evidence_demanded":"verify.sh exit 0","actual":["3 failed, 41 passed"]}
 ```
 
-Was behauptet wurde, was gefordert wurde, was wahr war. Nur lokale Festplatte,
-nie übertragen, aus, außer du schaltest es ein. Nach einem Monat hörst du auf,
-zu raten, wie dein Agent scheitert, und fängst an, es zu lesen.
+Die Zeile hält fest, was der Agent behauptet hat, was von ihm gefordert wurde
+und was sich als wahr herausstellte. Die Datei wird mit Modus `0600` auf die
+lokale Festplatte geschrieben, nichts überträgt sie irgendwohin, und sie bleibt
+aus, bis du sie einschaltest. Nach einem Monat an Einträgen kannst du aufhören
+zu raten, wie dein Agent scheitert, und es stattdessen nachlesen.
+`/prove-it:ledger` fasst die Datei für dich zusammen.
 
 ## Dieses Repo gated sich selbst
 
-`prove-it` hat ein `verify.sh`, und es führt das Gate gegen echte Git-Repos in
-einem temporären Verzeichnis aus: ein fehlschlagender Check blockiert, ein
-bestehender Check erlaubt, eine reine Lese-Sitzung bleibt unangetastet, ein
-sauberer Baum wird übersprungen, der Bypass funktioniert.
+`prove-it` hat ein `verify.sh`, und ein Teil dessen, was es ausführt, ist das
+Gate selbst, gegen echte Git-Repositorys in einem temporären Verzeichnis: ein
+fehlschlagender Check blockiert, ein bestehender Check erlaubt, eine reine
+Lese-Sitzung bleibt unangetastet, ein sauberer Baum wird übersprungen, der
+Bypass funktioniert.
 
 ```bash
 ./verify.sh
 ```
 
-Alles andere auszuliefern wäre eine merkwürdige Sache.
+CI führt genau dieses Skript auf Linux und macOS aus, dazu einen separaten Job,
+der beweist, dass das Gate ein Repository, dessen Checks fehlschlagen, weiterhin
+blockiert.
 
 ## Mitwirken
 
-Issues und Pull Requests sind willkommen. Änderungen an der Konvention selbst
-gehören in ein Issue statt in einen Pull Request gegen die
-Referenzimplementierung: Die Konvention ist das Artefakt, das Skript ist die
-Fußnote. Siehe [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Issues und Pull Requests sind willkommen. Änderungen an der Konvention gehören
+in ein Issue statt in einen Pull Request gegen die Referenzimplementierung.
+Siehe [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Lizenz
 

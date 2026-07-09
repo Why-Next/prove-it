@@ -2,15 +2,15 @@
 
 ## What this software does on your machine
 
-`prove-it` runs a script that lives in the repository you have open. That is the
-entire design, and it is worth being blunt about what it means: **if you open a
-repository you do not trust, and its `verify.sh` is executable, your agent
-ending a turn will execute that file.**
+`prove-it` runs a script that lives in the repository you have open. If you open
+a repository you do not trust, and its `verify.sh` is executable, your agent
+ending a turn will execute that file.
 
-This is not a vulnerability, it is the feature. It is also indistinguishable
-from the risk you already accept by running `npm install` or opening a project
-with a `Makefile`. Treat an unfamiliar `verify.sh` the way you treat an
-unfamiliar `postinstall` script: read it first.
+That behaviour is the design rather than a defect in it, and the risk is the one
+you already accept when you run `npm install` or open a project with a
+`Makefile`. Read an unfamiliar `verify.sh` before you let an agent work in the
+repository that contains it, the way you would read an unfamiliar `postinstall`
+script.
 
 The gate only runs when the session edited files **in that same repository**, the
 working tree is dirty, and an executable `verify.sh` exists at the repo root.
@@ -37,9 +37,9 @@ line per caught false completion to `~/.prove-it/ledger.jsonl`, created mode
 - the exit code and the last five lines of your `verify.sh` output
 - a timestamp
 
-Treat it as conversation data. Nothing in this project ever reads it back or
-sends it anywhere, but it is an ordinary file: your backups will copy it, and
-anyone with read access to your home directory can read it.
+Treat it as conversation data. Nothing in this project reads it back or sends it
+anywhere, but it remains an ordinary file, so your backups will copy it and
+anyone with read access to your home directory can open it.
 
 ## What it sends
 
@@ -58,10 +58,9 @@ Email **hello@whynext.app** with the details and a reproduction. Please do not
 open a public issue for anything that lets a repository escape the boundaries
 described above.
 
-Expect an acknowledgement within a few days. This is maintained by one person,
-so please be patient, and please do include the reproduction: a report I cannot
-reproduce is a report I cannot fix, which is the same principle the tool itself
-is built on.
+Expect an acknowledgement within a few days. One person maintains this, so
+patience helps, and so does the reproduction. A report I cannot reproduce is one
+I cannot fix.
 
 ## Supported versions
 
