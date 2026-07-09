@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -18,27 +23,28 @@
 
 `prove-it` は、*完了* をエージェントが口にできるものではなく、通過しなければならないものに変える。リポジトリのルートに `verify.sh` を置く。エージェントが停止しようとすると、ゲートがそれを実行する。終了コードがゼロ以外なら、ターンは終わらない。
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![完了したと主張するエージェントを prove-it がブロックする様子](../../docs/demo.svg)
 
 証拠を求められたエージェントは、おおよそ半分の確率で「そのとおり、まだ終わっていません」と答える。
 
 ## インストール
 
-`bash`、`git`、`python3` が必要。パッケージも、デーモンも、サインアップも要らない。どこにでもクローンできる:
+Claude Code プラグインとして:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-[`hooks/settings.example.json`](../../hooks/settings.example.json) を `.claude/settings.json`(リポジトリごと)または `~/.claude/settings.json`(全体)にマージして、2つのフックを Claude Code に組み込む。
+インストールはこれで全部だ。プラグインは2つのフックを登録する。1つはセッションがファイルを編集したことを記録し、もう1つはターンをゲートする。
+
+他のエージェントを使う場合、あるいはプラグインを入れたくない場合は、リポジトリをクローンして同じ2つのフックを自分で配線する。これらは素のbashで、`bash`、`git`、`python3` 以外には何も依存しない:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+[`hooks/settings.example.json`](../../hooks/settings.example.json) を `.claude/settings.json`(リポジトリごと)または `~/.claude/settings.json`(全体)にマージする。ゲートは Stop-hook の JSON ペイロードを標準入力から読み、終了コードで通信するので、ターン終了時にスクリプトを走らせられるものなら何でもこれを駆動できる。
 
 そして、唯一重要なファイルを書く:
 
@@ -57,7 +63,7 @@ EOF
 chmod +x verify.sh
 ```
 
-セットアップはこれで全部だ。リポジトリにはまだ `verify.sh` が無いので、書くまでゲートは何もしない。
+このファイルを書くまで、ゲートは何もしない。
 
 ## 最初の5分
 
@@ -102,6 +108,8 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
 
 `hooks/` にあるスクリプトは、意図的に小さくしてある。本当の成果物は、それが実装している規約であり、**[SPEC.md](../../SPEC.md)** に書かれている。リポジトリは、既知の場所で、既知の契約に従って、自らをどう証明するかを宣言する。そしてエージェントは、その証明が通るまで完了を主張してはならない。
 
+プラグインは配布経路であって、アイデアそのものではない。規約はどのエージェント1つよりも長く生き延びることを意図しているので、仕様はファイル名と終了コードを指定し、ベンダーは決して指定しない。
+
 `verify.sh` が突き合わせるべき4種類の証拠 - コマンド出力、diff、再現、クロスチェック - と適合レベルについては、仕様を読んでほしい。
 
 **最初に、正直な注記を1つ。** このツールが強制するのは、ちょうど1つだけ。ターンが終わる前に `verify.sh` がゼロを返したことだ。そのゼロに *意味* があるかどうかは、あなたが書いたチェック次第で決まる。`exit 0` だけの `verify.sh` はこのゲートを通過し、何も証明しない。ツールは Level 1 だ。証拠は Level 2 であり、Level 2 は機能ではなく実践だ。
@@ -139,6 +147,10 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
 ```
 
 そうでないものを出荷するのは、おかしな話だろう。
+
+## コントリビュート
+
+Issue と pull request を歓迎する。規約そのものへの変更は、リファレンス実装に対する pull request ではなく、issue に出すのがふさわしい。規約が成果物であり、スクリプトは脚注だ。[CONTRIBUTING.md](../../CONTRIBUTING.md) を参照。
 
 ## ライセンス
 

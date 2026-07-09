@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="410" viewBox="0 0 820 410" role="img" aria-labelledby="t d">
+  <title id="t">prove-it blocks an agent that claims it is done</title>
+  <desc id="d">A terminal. The agent says all tests pass and tries to end its turn. prove-it runs verify.sh, which exits 1 with three failing tests, and the turn is blocked. The agent then admits the tests were failing and keeps working.</desc>
+
+  <defs>
+    <style>
+      .m { font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 13.5px; }
+      .dim   { fill: #767A6C; }
+      .ink   { fill: #EDEEE6; }
+      .moss  { fill: #A3BC70; }
+      .brick { fill: #D98A6A; }
+      .gold  { fill: #CBAE5E; }
+      .b     { font-weight: 600; }
+    </style>
+  </defs>
+
+  <rect width="820" height="410" rx="8" fill="#14160F"/>
+  <rect x="0.5" y="0.5" width="819" height="409" rx="7.5" fill="none" stroke="#33372B"/>
+
+  <!-- title bar -->
+  <rect x="1" y="1" width="818" height="34" rx="7" fill="#1D2017"/>
+  <rect x="1" y="26" width="818" height="9" fill="#1D2017"/>
+  <circle cx="22" cy="18" r="5" fill="#3E4436"/>
+  <circle cx="40" cy="18" r="5" fill="#3E4436"/>
+  <circle cx="58" cy="18" r="5" fill="#3E4436"/>
+  <text class="m dim" x="410" y="23" text-anchor="middle">prove-it</text>
+
+  <!-- agent claim -->
+  <text class="m" x="24" y="68">
+    <tspan class="dim">agent ▸</tspan>
+    <tspan class="ink" dx="8">"All tests pass. Ready to merge."</tspan>
+  </text>
+
+  <!-- attempt to stop -->
+  <text class="m dim" x="24" y="96">        └─ tries to end turn</text>
+
+  <!-- gate fires -->
+  <text class="m" x="24" y="124">
+    <tspan class="dim">           └─</tspan>
+    <tspan class="moss b" dx="6">prove-it</tspan>
+    <tspan class="dim" dx="6">runs ./verify.sh</tspan>
+  </text>
+
+  <!-- verify output -->
+  <text class="m dim" x="24" y="152">                 │</text>
+  <text class="m" x="24" y="176">
+    <tspan class="dim">                 │</tspan>
+    <tspan class="brick" dx="10">FAIL</tspan>
+    <tspan class="ink" dx="8">src/auth.test.ts</tspan>
+  </text>
+  <text class="m" x="24" y="200">
+    <tspan class="dim">                 │</tspan>
+    <tspan class="dim" dx="10">3 failed, 41 passed</tspan>
+  </text>
+  <text class="m" x="24" y="224">
+    <tspan class="dim">                 └─</tspan>
+    <tspan class="brick b" dx="8">exit 1</tspan>
+  </text>
+
+  <!-- blocked banner -->
+  <rect x="60" y="244" width="700" height="42" rx="4" fill="#33211A" stroke="#D98A6A" stroke-opacity="0.45"/>
+  <rect x="60" y="244" width="3" height="42" fill="#D98A6A"/>
+  <text class="m b brick" x="80" y="270">turn blocked</text>
+  <text class="m dim" x="196" y="270">verification failed. the agent keeps working.</text>
+
+  <!-- agent corrects itself -->
+  <text class="m" x="24" y="320">
+    <tspan class="dim">agent ▸</tspan>
+    <tspan class="ink" dx="8">"Actually, three tests were failing. Fixing."</tspan>
+  </text>
+
+  <!-- footer rule + thesis -->
+  <line x1="24" y1="348" x2="796" y2="348" stroke="#33372B"/>
+  <text class="m" x="24" y="378">
+    <tspan class="gold">done</tspan>
+    <tspan class="dim" dx="8">is not something an agent declares. it is a check it has to pass.</tspan>
+  </text>
+</svg>

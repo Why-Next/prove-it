@@ -1,0 +1,57 @@
+name: Spec proposal
+description: Change the verify.sh convention itself.
+labels: ["spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The convention is the artifact and the script is the footnote, so changes
+        to SPEC.md start here rather than as a pull request. The bar is high on
+        purpose: every addition is something every future implementation has to
+        carry.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What does the current convention fail to express
+      description: A repository or workflow that cannot state how it proves itself today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed wording
+      description: Write it as it would appear in SPEC.md, not as a description of what you mean.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: level
+    attributes:
+      label: Which conformance level does this touch
+      options:
+        - "Level 1 - the gate (machine-enforced)"
+        - "Level 2 - the evidence (a practice)"
+        - "Level 3 - the ledger"
+        - "A new level"
+    validations:
+      required: true
+
+  - type: textarea
+    id: enforcement
+    attributes:
+      label: Can a tool enforce it, and how
+      description: |
+        If it cannot be enforced, say so plainly. That is not disqualifying,
+        it just means the proposal belongs at Level 2, and the spec must say so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: breakage
+    attributes:
+      label: What breaks
+      description: Which existing conforming repositories stop conforming.
+    validations:
+      required: true

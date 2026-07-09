@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -14,31 +19,32 @@
 
 **당신의 레포가 스스로를 증명하기 전까지, 에이전트는 자기 차례를 끝낼 수 없습니다.**
 
-코딩 에이전트는 테스트를 돌려보지도 않고 "테스트 통과"라고 말하고, 버그를 재현해본 적도 없이 "고쳤다"고 말합니다. 악의가 있어서가 아닙니다. 에이전트는 자기가 실제로 한 일과 하려던 일을 구분하지 못하기 때문에, 의도를 그대로 보고하는 것뿐입니다.
+코딩 에이전트는 테스트를 돌려보지도 않고 "테스트 통과"라고 말하고, 버그를 재현해본 적도 없이 "고쳤다"고 말합니다. 악의가 있어서가 아닙니다. 에이전트는 자기가 실제로 한 일과 하려던 일을 구분하지 못하기 때문에, 의도를 그대로 보고할 뿐입니다.
 
 `prove-it`는 *완료*를 에이전트가 그냥 말할 수 있는 것이 아니라 통과해야만 하는 것으로 만듭니다. 레포 루트에 `verify.sh`를 두세요. 에이전트가 멈추려고 하면 게이트가 이걸 실행합니다. 종료 코드가 0이 아니면 그 차례는 끝나지 않습니다.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![완료됐다고 주장하는 에이전트를 prove-it가 막는 모습](../../docs/demo.svg)
 
 증거를 요구받은 에이전트는 대략 절반의 경우 "맞아요, 아직 안 끝났네요"라고 답합니다.
 
 ## 설치
 
-`bash`, `git`, `python3`가 필요합니다. 설치할 패키지도, 데몬도, 가입할 서비스도 없습니다. 아무데나 클론하세요:
+Claude Code 플러그인으로:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-[`hooks/settings.example.json`](../../hooks/settings.example.json)을 `.claude/settings.json`(레포별) 또는 `~/.claude/settings.json`(전역)에 병합해서 두 개의 훅을 Claude Code에 연결하세요.
+설치는 이게 전부입니다. 플러그인은 훅 두 개를 등록합니다. 하나는 세션이 파일을 편집했다는 걸 표시하고, 하나는 차례를 게이트합니다.
+
+다른 에이전트를 쓰거나 플러그인을 설치하고 싶지 않다면, 레포를 클론해서 같은 훅 두 개를 직접 연결하세요. 훅은 평범한 bash이고 `bash`, `git`, `python3` 말고는 아무것도 필요로 하지 않습니다:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+[`hooks/settings.example.json`](../../hooks/settings.example.json)을 `.claude/settings.json`(레포별) 또는 `~/.claude/settings.json`(전역)에 병합하세요. 게이트는 stdin으로 Stop 훅 JSON 페이로드를 읽고 종료 코드로 소통하므로, 차례가 끝나는 시점에 스크립트를 돌릴 수 있는 것이라면 무엇이든 이걸 구동할 수 있습니다.
 
 그런 다음 정말 중요한 유일한 파일을 작성합니다:
 
@@ -57,7 +63,7 @@ EOF
 chmod +x verify.sh
 ```
 
-이게 설정의 전부입니다. 아직 레포에 `verify.sh`가 없으니, 하나 작성하기 전까지는 게이트가 아무 일도 하지 않습니다.
+그 파일을 작성하기 전까지는 게이트가 아무 일도 하지 않습니다.
 
 ## 처음 5분
 
@@ -102,6 +108,8 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
 
 `hooks/`에 있는 스크립트는 일부러 작게 만들었습니다. 진짜 산출물은 그 스크립트가 구현하는 컨벤션이고, 이건 **[SPEC.md](../../SPEC.md)**에 적혀 있습니다. 레포는 자기가 어떻게 스스로를 증명하는지를 알려진 위치에서 알려진 계약으로 선언하고, 에이전트는 그 증명이 통과하기 전까지 완료를 주장할 수 없습니다.
 
+플러그인은 배포 통로일 뿐 아이디어 자체가 아닙니다. 컨벤션은 어느 한 에이전트보다 오래 살아남도록 만들어졌기에, 스펙은 파일과 종료 코드를 명시할 뿐 특정 벤더는 절대 명시하지 않습니다.
+
 `verify.sh`가 검증해야 할 네 종류의 증거 - 명령 출력, diff, 재현, 교차 확인 - 와 준수 레벨에 대해서는 스펙을 읽어보세요.
 
 **미리 솔직하게 짚어둘 점 하나.** 이 도구가 강제하는 건 딱 하나입니다. 차례가 끝나기 전에 `verify.sh`가 0을 반환했다는 사실. 그 0이 *무언가를 의미하는지*는 전적으로 당신이 작성한 검사에 달려 있습니다. `exit 0`만 들어 있는 `verify.sh`는 이 게이트를 통과하지만 아무것도 증명하지 않습니다. 도구는 Level 1입니다. 증거는 Level 2이고, Level 2는 기능이 아니라 실천입니다.
@@ -139,6 +147,10 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
 ```
 
 안 그랬다면 내놓기에 이상한 물건이었겠죠.
+
+## 기여하기
+
+이슈와 풀 리퀘스트를 환영합니다. 컨벤션 자체를 바꾸는 일은 레퍼런스 구현에 대한 풀 리퀘스트보다 이슈로 올려야 합니다. 컨벤션이 산출물이고, 스크립트는 각주니까요. [CONTRIBUTING.md](../../CONTRIBUTING.md)를 참고하세요.
 
 ## 라이선스
 

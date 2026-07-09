@@ -1,0 +1,15 @@
+{
+  "name": "whynext",
+  "description": "The verify.sh convention and its reference implementation. Done is not a declaration, it is a check you pass.",
+  "owner": {
+    "name": "Why-Next",
+    "email": "hello@whynext.app"
+  },
+  "plugins": [
+    {
+      "name": "prove-it",
+      "source": "./",
+      "description": "Blocks an agent from ending its turn while ./verify.sh fails. No dependencies beyond bash, git, python3."
+    }
+  ]
+}

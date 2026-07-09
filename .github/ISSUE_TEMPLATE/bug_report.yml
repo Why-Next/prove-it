@@ -1,0 +1,62 @@
+name: Bug report
+description: The gate did something other than what the spec says it does.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: run `./verify.sh` in your own repo and paste what it printed.
+        A report we cannot reproduce is a report we cannot fix, which is rather
+        the point of this project.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+      description: Quote the line of SPEC.md or README.md that says so, if there is one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the gate's output, including the exit code.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: |
+        The smallest sequence of commands that shows it. A fresh `git init` in a
+        temp directory is ideal. `tests/test_gate.sh` is a working example of the
+        shape we are after.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: verify
+    attributes:
+      label: Your verify.sh
+      render: shell
+
+  - type: input
+    id: install
+    attributes:
+      label: How is it installed
+      placeholder: plugin (prove-it@whynext), or hooks wired by hand
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: "Output of: `bash --version | head -1; git --version; python3 --version; uname -sr`"
+      render: shell
+    validations:
+      required: true

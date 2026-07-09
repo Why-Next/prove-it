@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 English ·
 [中文](docs/i18n/README.zh.md) ·
 [Deutsch](docs/i18n/README.de.md) ·
@@ -22,31 +27,35 @@ what it meant to do, so it reports the intention.
 say. Put a `verify.sh` at your repo root. When the agent tries to stop, the gate
 runs it. Non-zero exit, and the turn does not end.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it blocks an agent that claims it is done](docs/demo.svg)
 
 Roughly half the time, an agent asked for evidence answers "you're right, it
 isn't done yet."
 
 ## Install
 
-Requires `bash`, `git`, `python3`. No packages, no daemon, nothing to sign up
-for. Clone it anywhere:
+As a Claude Code plugin:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-Wire the two hooks into Claude Code by merging
-[`hooks/settings.example.json`](hooks/settings.example.json) into your
+That is the whole install. The plugin registers two hooks: one marks that a
+session edited files, one gates the turn.
+
+For any other agent, or if you would rather not install a plugin, clone the repo
+and wire the same two hooks yourself. They are plain bash and depend on nothing
+but `bash`, `git`, and `python3`:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+Merge [`hooks/settings.example.json`](hooks/settings.example.json) into your
 `.claude/settings.json` (per repo) or `~/.claude/settings.json` (everywhere).
+The gate reads a Stop-hook JSON payload on stdin and communicates by exit code,
+so anything that can run a script at end-of-turn can drive it.
 
 Then write the only file that matters:
 
@@ -65,8 +74,7 @@ EOF
 chmod +x verify.sh
 ```
 
-That is the whole setup. There is no `verify.sh` in your repo yet, so until you
-write one, the gate does nothing at all.
+Until you write that file, the gate does nothing at all.
 
 ## Your first five minutes
 
@@ -131,6 +139,9 @@ it implements, written down in **[SPEC.md](SPEC.md)**: a repository declares how
 it proves itself, in a known place, with a known contract, and an agent may not
 claim completion until that proof passes.
 
+The plugin is a distribution channel, not the idea. The convention is meant to
+outlive any one agent, so the spec names a file and an exit code, never a vendor.
+
 Read the spec for the four kinds of evidence a `verify.sh` should assert
 against - command output, diff, reproduction, cross-check - and for the
 conformance levels.
@@ -181,6 +192,13 @@ untouched, clean tree is skipped, bypass works.
 ```
 
 It would be an odd thing to ship otherwise.
+
+## Contributing
+
+Issues and pull requests are welcome. Changes to the convention itself belong in
+an issue rather than a pull request against the reference implementation: the
+convention is the artifact, the script is the footnote. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

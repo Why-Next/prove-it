@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -22,31 +27,36 @@ que hizo de lo que pretendía hacer, así que reporta la intención.
 simplemente afirmar. Pon un `verify.sh` en la raíz de tu repo. Cuando el agente intenta
 detenerse, la barrera lo ejecuta. Salida distinta de cero, y el turno no termina.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it bloquea a un agente que afirma haber terminado](../../docs/demo.svg)
 
 Aproximadamente la mitad de las veces, un agente al que se le pide evidencia responde
 "tienes razón, todavía no está hecho".
 
 ## Instalación
 
-Requiere `bash`, `git`, `python3`. Sin paquetes, sin demonio, nada a lo que registrarse.
-Clónalo en cualquier lugar:
+Como plugin de Claude Code:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-Conecta los dos hooks a Claude Code fusionando
-[`hooks/settings.example.json`](../../hooks/settings.example.json) en tu
+Esa es toda la instalación. El plugin registra dos hooks: uno marca que una sesión editó
+archivos, otro pone la barrera al turno.
+
+Para cualquier otro agente, o si prefieres no instalar un plugin, clona el repo y conecta
+los mismos dos hooks tú mismo. Son bash puro y no dependen de nada más que de `bash`,
+`git` y `python3`:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+Fusiona [`hooks/settings.example.json`](../../hooks/settings.example.json) en tu
 `.claude/settings.json` (por repo) o `~/.claude/settings.json` (en todas partes).
+La barrera lee una carga JSON del Stop hook por stdin y se comunica mediante el código de
+salida, así que cualquier cosa que pueda ejecutar un script al final del turno puede
+manejarla.
 
 Luego escribe el único archivo que importa:
 
@@ -65,8 +75,7 @@ EOF
 chmod +x verify.sh
 ```
 
-Esa es toda la configuración. Todavía no hay ningún `verify.sh` en tu repo, así que hasta
-que escribas uno, la barrera no hace absolutamente nada.
+Hasta que escribas ese archivo, la barrera no hace absolutamente nada.
 
 ## Tus primeros cinco minutos
 
@@ -131,6 +140,10 @@ implementa, escrita en **[SPEC.md](../../SPEC.md)**: un repositorio declara cóm
 a sí mismo, en un lugar conocido, con un contrato conocido, y un agente no puede reclamar la
 finalización hasta que esa prueba pase.
 
+El plugin es un canal de distribución, no la idea. La convención está pensada para sobrevivir
+a cualquier agente concreto, así que la especificación nombra un archivo y un código de
+salida, nunca un proveedor.
+
 Lee la especificación para conocer los cuatro tipos de evidencia que un `verify.sh` debería
 verificar - salida de comandos, diff, reproducción, comprobación cruzada - y para los niveles
 de conformidad.
@@ -181,6 +194,13 @@ lectura queda intacta, el árbol limpio se omite, el bypass funciona.
 ```
 
 Sería raro publicarlo de otra manera.
+
+## Contribuir
+
+Los issues y pull requests son bienvenidos. Los cambios a la convención en sí pertenecen a un
+issue en vez de a un pull request contra la implementación de referencia: la convención es el
+artefacto, el script es la nota al pie. Consulta
+[CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Licencia
 

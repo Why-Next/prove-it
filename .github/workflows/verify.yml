@@ -1,0 +1,78 @@
+name: verify
+
+# The repo's own gate is the CI. If verify.sh is what we ask other people to
+# trust, running anything else here would be a different claim than the one we
+# ship.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # macOS uses BSD cksum and BSD date; Linux uses GNU. The gate hashes tree
+    # state with cksum and stamps the ledger with date, so both have to pass.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y shellcheck
+          else
+            brew install shellcheck
+          fi
+
+      - name: Show versions
+        run: |
+          bash --version | head -1
+          git --version
+          python3 --version
+          shellcheck --version | grep version:
+
+      - name: Run the gate
+        run: ./verify.sh
+
+  # The gate has to fail when it should. A green verify.sh only proves the happy
+  # path; this proves the unhappy one, in CI, on every commit.
+  gate-blocks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: A failing verify.sh must block the turn
+        run: |
+          set -eu
+          sandbox=$(mktemp -d)
+          git -C "$sandbox" init -q
+          git -C "$sandbox" config user.email ci@example.com
+          git -C "$sandbox" config user.name ci
+          echo base > "$sandbox/file.txt"
+          git -C "$sandbox" add -A
+          git -C "$sandbox" commit -qm init
+          echo dirty >> "$sandbox/file.txt"
+          printf '#!/bin/bash\nexit 1\n' > "$sandbox/verify.sh"
+          chmod +x "$sandbox/verify.sh"
+
+          printf '{"session_id":"ci"}' | bash hooks/mark-session-write.sh
+          set +e
+          ( cd "$sandbox" && printf '{"session_id":"ci","stop_hook_active":false,"transcript_path":""}' \
+              | bash "$GITHUB_WORKSPACE/hooks/prove-it.sh" >/dev/null 2>&1 )
+          rc=$?
+          set -e
+
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::gate returned $rc, expected 2 (turn blocked)"
+            exit 1
+          fi
+          echo "gate blocked the turn, as it must"

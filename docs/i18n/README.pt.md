@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -23,31 +28,35 @@ ele pode simplesmente dizer. Coloque um `verify.sh` na raiz do seu repositório.
 Quando o agente tenta parar, o portão o executa. Saída diferente de zero, e o turno
 não termina.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it bloqueia um agente que afirma estar pronto](../../docs/demo.svg)
 
 Em cerca de metade das vezes, um agente ao qual se pede evidência responde "você tem
 razão, ainda não está pronto".
 
 ## Instalação
 
-Requer `bash`, `git`, `python3`. Sem pacotes, sem daemon, nada em que se cadastrar.
-Clone em qualquer lugar:
+Como um plugin do Claude Code:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-Conecte os dois hooks ao Claude Code mesclando
-[`hooks/settings.example.json`](../../hooks/settings.example.json) no seu
+Essa é toda a instalação. O plugin registra dois hooks: um marca que uma sessão
+editou arquivos, o outro aplica o portão ao turno.
+
+Para qualquer outro agente, ou se você preferir não instalar um plugin, clone o
+repositório e conecte os mesmos dois hooks você mesmo. Eles são bash puro e não
+dependem de nada além de `bash`, `git` e `python3`:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+Mescle [`hooks/settings.example.json`](../../hooks/settings.example.json) no seu
 `.claude/settings.json` (por repositório) ou `~/.claude/settings.json` (em todo lugar).
+O portão lê um payload JSON do Stop hook no stdin e se comunica por código de saída,
+então qualquer coisa capaz de rodar um script no fim do turno consegue acioná-lo.
 
 Depois escreva o único arquivo que importa:
 
@@ -66,8 +75,7 @@ EOF
 chmod +x verify.sh
 ```
 
-Essa é toda a configuração. Ainda não há um `verify.sh` no seu repositório, então até
-você escrever um, o portão não faz absolutamente nada.
+Até você escrever esse arquivo, o portão não faz absolutamente nada.
 
 ## Seus primeiros cinco minutos
 
@@ -133,6 +141,10 @@ ele implementa, escrita em **[SPEC.md](../../SPEC.md)**: um repositório declara
 se prova, em um lugar conhecido, com um contrato conhecido, e um agente não pode
 reivindicar conclusão até que essa prova passe.
 
+O plugin é um canal de distribuição, não a ideia. A convenção existe para sobreviver
+a qualquer agente em particular, então a spec nomeia um arquivo e um código de saída,
+nunca um fornecedor.
+
 Leia a spec para os quatro tipos de evidência que um `verify.sh` deveria afirmar -
 saída de comando, diff, reprodução, verificação cruzada - e para os níveis de
 conformidade.
@@ -185,6 +197,13 @@ funciona.
 ```
 
 Seria uma coisa estranha de publicar de outra forma.
+
+## Contribuindo
+
+Issues e pull requests são bem-vindos. Mudanças na convenção em si pertencem a uma
+issue, e não a um pull request contra a implementação de referência: a convenção é o
+artefato, o script é a nota de rodapé. Veja
+[CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Licença
 

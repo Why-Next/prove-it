@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -12,7 +17,7 @@ Français ·
 [Español](README.es.md) ·
 [한국어](README.ko.md)
 
-**Votre agent ne peut pas terminer son tour tant que votre dépôt ne se prouve pas lui-même.**
+**Votre agent ne peut pas terminer son tour tant que votre dépôt ne s'est pas prouvé lui-même.**
 
 Les agents de code disent "les tests passent" sans les avoir lancés, et "corrigé"
 sans avoir jamais reproduit le bug. Non par malveillance : un agent ne peut pas
@@ -24,31 +29,35 @@ chose qu'il peut se contenter de dire. Placez un `verify.sh` à la racine de vot
 dépôt. Quand l'agent tente de s'arrêter, la barrière le lance. Sortie non nulle,
 et le tour ne se termine pas.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it bloque un agent qui prétend avoir terminé](../../docs/demo.svg)
 
 À peu près une fois sur deux, un agent à qui l'on demande des preuves répond
 "vous avez raison, ce n'est pas encore fini."
 
 ## Installation
 
-Nécessite `bash`, `git`, `python3`. Aucun paquet, aucun daemon, aucune
-inscription. Clonez-le n'importe où :
+En tant que plugin Claude Code :
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-Branchez les deux hooks dans Claude Code en fusionnant
-[`hooks/settings.example.json`](../../hooks/settings.example.json) dans votre
-`.claude/settings.json` (par dépôt) ou `~/.claude/settings.json` (partout).
+C'est toute l'installation. Le plugin enregistre deux hooks : l'un marque qu'une
+session a modifié des fichiers, l'autre met le tour sous barrière.
+
+Pour tout autre agent, ou si vous préférez ne pas installer de plugin, clonez le
+dépôt et branchez vous-même les deux mêmes hooks. Ce sont de simples scripts bash
+qui ne dépendent de rien d'autre que `bash`, `git` et `python3` :
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+Fusionnez [`hooks/settings.example.json`](../../hooks/settings.example.json) dans
+votre `.claude/settings.json` (par dépôt) ou `~/.claude/settings.json` (partout).
+La barrière lit une charge JSON de Stop hook sur stdin et communique par code de
+sortie, donc tout ce qui peut lancer un script en fin de tour peut la piloter.
 
 Ensuite, écrivez le seul fichier qui compte :
 
@@ -67,8 +76,7 @@ EOF
 chmod +x verify.sh
 ```
 
-C'est toute la configuration. Il n'y a pas encore de `verify.sh` dans votre dépôt,
-donc tant que vous n'en écrivez pas un, la barrière ne fait absolument rien.
+Tant que vous n'écrivez pas ce fichier, la barrière ne fait absolument rien.
 
 ## Vos cinq premières minutes
 
@@ -137,6 +145,10 @@ un dépôt déclare comment il se prouve lui-même, dans un endroit connu, avec 
 contrat connu, et un agent ne peut pas revendiquer l'achèvement tant que cette
 preuve ne passe pas.
 
+Le plugin est un canal de distribution, pas l'idée. La convention est censée
+survivre à n'importe quel agent, donc la spec nomme un fichier et un code de
+sortie, jamais un fournisseur.
+
 Lisez la spec pour les quatre types de preuves qu'un `verify.sh` devrait affirmer -
 sortie de commande, diff, reproduction, vérification croisée - et pour les niveaux
 de conformité.
@@ -156,10 +168,10 @@ vérifications lentes ont leur place dans la CI.
 
 | | |
 |---|---|
-| [`node.sh`](../../recipes/node.sh) | tests, typecheck, lint, diff hygiene |
+| [`node.sh`](../../recipes/node.sh) | tests, typage, lint, hygiène du diff |
 | [`python.sh`](../../recipes/python.sh) | pytest, ruff, mypy |
-| [`go.sh`](../../recipes/go.sh) | go test, vet, gofmt check |
-| [`flutter.sh`](../../recipes/flutter.sh) | analyze, test, format check |
+| [`go.sh`](../../recipes/go.sh) | go test, vet, vérification gofmt |
+| [`flutter.sh`](../../recipes/flutter.sh) | analyze, test, vérification du format |
 
 Le plus dur dans l'adoption de ceci n'est jamais de brancher le hook. C'est de
 répondre à "que signifie *prouvé* dans ce dépôt" pour la première fois.
@@ -190,6 +202,13 @@ arbre propre est sauté, le contournement fonctionne.
 ```
 
 Il serait étrange de livrer autrement.
+
+## Contribution
+
+Les issues et les pull requests sont bienvenues. Les modifications de la convention
+elle-même relèvent d'une issue plutôt que d'une pull request contre
+l'implémentation de référence : la convention est l'artefact, le script est la note
+de bas de page. Voir [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Licence
 

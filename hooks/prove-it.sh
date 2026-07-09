@@ -8,7 +8,7 @@
 # Opt-in by design: no verify.sh means no gate. Delete the file to opt out.
 #
 # The gate runs only when all of these hold:
-#   - the session actually edited files (marker from mark-session-write.sh)
+#   - this session edited files in THIS repository (marker from mark-session-write.sh)
 #   - an executable verify.sh exists at the repo root
 #   - the working tree has changes (staged, unstaged, or untracked)
 #   - this exact tree state has not already passed (avoids re-running per Stop)
@@ -19,7 +19,8 @@
 # PROVE_IT_SKIP=1 bypasses the gate. Internal errors fall back to passing.
 #
 # Optional ledger (PROVE_IT_LEDGER=1): append one JSON line per caught
-# false "done" to $PROVE_IT_LEDGER_DIR/ledger.jsonl. Local only, never sent.
+# false "done" to $PROVE_IT_LEDGER_DIR/ledger.jsonl. It holds conversation
+# text, so it is created 0600 in a 0700 directory. Local only, never sent.
 
 set -u
 
@@ -41,9 +42,16 @@ TRANSCRIPT=$(printf '%s\n' "$PARSED" | sed -n 3p)
 [ "$STOP_ACTIVE" = "1" ] && exit 0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+REPO_KEY=$(printf '%s' "$ROOT" | cksum | tr -s ' ' '-')
 
-# A read-only session has nothing to prove.
-MARKER="${TMPDIR:-/tmp}/prove-it-session-wrote-${SESSION_ID}"
+# Private state, never shared /tmp: these names are predictable, and a
+# world-writable directory turns a predictable name into a symlink target.
+STATE_DIR="${PROVE_IT_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/prove-it}"
+(umask 077 && mkdir -p "$STATE_DIR") 2>/dev/null || exit 0
+
+# A read-only session, or one that only edited some other repo, has nothing
+# to prove here.
+MARKER="$STATE_DIR/wrote-${SESSION_ID}-${REPO_KEY}"
 [ -f "$MARKER" ] || exit 0
 
 VERIFY="$ROOT/verify.sh"
@@ -60,7 +68,7 @@ STATE=$( { git -C "$ROOT" rev-parse HEAD 2>/dev/null
            git -C "$ROOT" ls-files --others --exclude-standard 2>/dev/null | head -500 \
                | while IFS= read -r f; do cksum "$ROOT/$f" 2>/dev/null; done; } | cksum | tr -s ' ' '-')
 
-STAMP="${TMPDIR:-/tmp}/prove-it-stamp-$(printf '%s' "$ROOT" | cksum | tr -s ' ' '-')"
+STAMP="$STATE_DIR/stamp-${REPO_KEY}"
 if [ -f "$STAMP" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$STATE" ]; then
     exit 0
 fi
@@ -75,7 +83,7 @@ fi
 # The gate just caught a false "done". Record it, if the operator asked for that.
 if [ "${PROVE_IT_LEDGER:-}" = "1" ]; then
     LEDGER_DIR="${PROVE_IT_LEDGER_DIR:-$HOME/.prove-it}"
-    mkdir -p "$LEDGER_DIR" 2>/dev/null && \
+    (umask 077 && mkdir -p "$LEDGER_DIR") 2>/dev/null && \
     TS=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
     REPO="$ROOT" RC="$RC" TRANSCRIPT="$TRANSCRIPT" OUT="$OUT" python3 -c "
 import json, os, sys
@@ -115,7 +123,12 @@ entry = {
     'evidence_demanded': 'verify.sh exit 0',
     'actual': os.environ['OUT'].strip().splitlines()[-5:],
 }
-with open(os.path.join(sys.argv[1], 'ledger.jsonl'), 'a', encoding='utf-8') as fh:
+
+# This file holds conversation text. Create it 0600 rather than inheriting a
+# umask that would leave it world-readable on a shared machine.
+path = os.path.join(sys.argv[1], 'ledger.jsonl')
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+with os.fdopen(fd, 'a', encoding='utf-8') as fh:
     fh.write(json.dumps(entry, ensure_ascii=False) + '\n')
 " "$LEDGER_DIR" 2>/dev/null || true
 fi

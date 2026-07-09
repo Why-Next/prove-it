@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 [Deutsch](README.de.md) ·
@@ -18,27 +23,28 @@ Coding agents "tests pass" कह देते हैं बिना उन्�
 
 `prove-it` *done* को ऐसी चीज़ बना देता है जिसे agent को pass करना पड़ता है, न कि ऐसी चीज़ जिसे वह बस कह सकता है। अपने repo की root में एक `verify.sh` रखिए। जब agent रुकने की कोशिश करता है, gate उसे चलाता है। Non-zero exit हुआ, और turn खत्म नहीं होती।
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it एक ऐसे agent को block करता है जो दावा करता है कि वह हो गया है](../../docs/demo.svg)
 
 लगभग आधी बार, जब किसी agent से सबूत माँगा जाता है तो वह जवाब देता है "you're right, it isn't done yet."
 
 ## इंस्टॉल
 
-`bash`, `git`, `python3` चाहिए। कोई package नहीं, कोई daemon नहीं, कहीं sign up करने की ज़रूरत नहीं। इसे कहीं भी clone कर लीजिए:
+एक Claude Code plugin के रूप में:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-[`hooks/settings.example.json`](../../hooks/settings.example.json) को अपनी `.claude/settings.json` (per repo) या `~/.claude/settings.json` (everywhere) में merge करके दोनों hooks को Claude Code में जोड़ दीजिए।
+बस इतना ही पूरा install है। plugin दो hooks register करता है: एक यह mark करता है कि किसी session ने फाइलें edit कीं, दूसरा turn को gate करता है।
+
+किसी भी दूसरे agent के लिए, या अगर आप plugin install नहीं करना चाहते, तो repo को clone कीजिए और वही दो hooks खुद wire कीजिए। ये plain bash हैं और `bash`, `git`, और `python3` के अलावा किसी चीज़ पर निर्भर नहीं हैं:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+[`hooks/settings.example.json`](../../hooks/settings.example.json) को अपनी `.claude/settings.json` (per repo) या `~/.claude/settings.json` (everywhere) में merge कीजिए। gate stdin पर एक Stop hook JSON payload पढ़ता है और exit code के ज़रिए communicate करता है, इसलिए जो कुछ भी turn के अंत में एक script चला सकता है, वह इसे drive कर सकता है।
 
 फिर वही एक फाइल लिखिए जो असल में मायने रखती है:
 
@@ -57,7 +63,7 @@ EOF
 chmod +x verify.sh
 ```
 
-बस इतना ही setup है। आपके repo में अभी कोई `verify.sh` नहीं है, इसलिए जब तक आप एक नहीं लिखते, gate कुछ भी नहीं करता।
+जब तक आप वह फाइल नहीं लिखते, gate कुछ भी नहीं करता।
 
 ## आपके पहले पाँच मिनट
 
@@ -139,6 +145,10 @@ spec को पढ़िए उन चार तरह के evidence के �
 ```
 
 वरना इसे ship करना एक अजीब बात होती।
+
+## योगदान
+
+Issues और pull requests का स्वागत है। convention में खुद के बदलाव reference implementation के खिलाफ pull request के बजाय एक issue में होने चाहिए: convention ही artifact है, script तो footnote है। देखिए [CONTRIBUTING.md](../../CONTRIBUTING.md)।
 
 ## लाइसेंस
 

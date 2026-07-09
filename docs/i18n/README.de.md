@@ -1,5 +1,10 @@
 # prove-it
 
+[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
+[![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
+![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
+
 [English](../../README.md) ·
 [中文](README.zh.md) ·
 Deutsch ·
@@ -24,32 +29,36 @@ das er einfach behaupten darf. Leg ein `verify.sh` in das Wurzelverzeichnis
 deines Repos. Wenn der Agent aufhören will, führt das Gate es aus. Exit-Code
 ungleich null, und der Zug endet nicht.
 
-```
-agent: "All tests pass. Ready to merge."
-       └─ tries to end turn
-          └─ prove-it runs ./verify.sh
-             └─ exit 1:  FAIL src/auth.test.ts  (3 failed, 41 passed)
-                └─ turn blocked, agent keeps working
-
-agent: "Actually, three tests were failing. Fixing."
-```
+![prove-it blockiert einen Agenten, der behauptet, fertig zu sein](../../docs/demo.svg)
 
 Etwa in der Hälfte der Fälle antwortet ein Agent, den man um Beweise bittet, mit
 "du hast recht, es ist noch nicht fertig."
 
 ## Installation
 
-Erfordert `bash`, `git`, `python3`. Keine Pakete, kein Daemon, keine Anmeldung.
-Klone es an einen beliebigen Ort:
+Als Claude Code Plugin:
 
-```bash
-git clone https://github.com/YOUR_ORG/prove-it ~/.local/share/prove-it
+```
+/plugin marketplace add WhyNext/prove-it
+/plugin install prove-it@whynext
 ```
 
-Verdrahte die zwei Hooks in Claude Code, indem du
-[`hooks/settings.example.json`](../../hooks/settings.example.json) in deine
-`.claude/settings.json` (pro Repo) oder `~/.claude/settings.json` (überall)
-einfügst.
+Das ist die gesamte Installation. Das Plugin registriert zwei Hooks: einer
+markiert, dass eine Sitzung Dateien bearbeitet hat, einer gated den Zug.
+
+Für jeden anderen Agenten, oder wenn du lieber kein Plugin installieren
+möchtest, klone das Repo und verdrahte dieselben zwei Hooks selbst. Sie sind
+reines bash und hängen von nichts ab außer `bash`, `git` und `python3`:
+
+```bash
+git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+```
+
+Füge [`hooks/settings.example.json`](../../hooks/settings.example.json) in deine
+`.claude/settings.json` (pro Repo) oder `~/.claude/settings.json` (überall) ein.
+Das Gate liest eine Stop-hook-JSON-Nutzlast von stdin und kommuniziert über den
+Exit-Code, sodass alles, was am Ende eines Zuges ein Skript ausführen kann, es
+antreiben kann.
 
 Dann schreib die einzige Datei, die zählt:
 
@@ -68,8 +77,7 @@ EOF
 chmod +x verify.sh
 ```
 
-Das ist die gesamte Einrichtung. Es gibt noch kein `verify.sh` in deinem Repo,
-also tut das Gate gar nichts, bis du eines schreibst.
+Bis du diese Datei schreibst, tut das Gate gar nichts.
 
 ## Deine ersten fünf Minuten
 
@@ -139,6 +147,10 @@ Repository erklärt, wie es sich selbst beweist, an einem bekannten Ort, mit ein
 bekannten Vertrag, und ein Agent darf keine Fertigstellung behaupten, bis dieser
 Beweis besteht.
 
+Das Plugin ist ein Vertriebskanal, nicht die Idee. Die Konvention soll jeden
+einzelnen Agenten überdauern, deshalb benennt die Spec eine Datei und einen
+Exit-Code, niemals einen Anbieter.
+
 Lies die Spec für die vier Arten von Beweisen, gegen die ein `verify.sh` prüfen
 sollte - Kommando-Ausgabe, Diff, Reproduktion, Gegenprüfung - und für die
 Konformitätsstufen.
@@ -192,6 +204,13 @@ sauberer Baum wird übersprungen, der Bypass funktioniert.
 ```
 
 Alles andere auszuliefern wäre eine merkwürdige Sache.
+
+## Mitwirken
+
+Issues und Pull Requests sind willkommen. Änderungen an der Konvention selbst
+gehören in ein Issue statt in einen Pull Request gegen die
+Referenzimplementierung: Die Konvention ist das Artefakt, das Skript ist die
+Fußnote. Siehe [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Lizenz
 

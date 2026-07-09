@@ -19,8 +19,12 @@ import unicodedata
 # em, en, horizontal bar, minus sign, figure dash, non-breaking hyphen
 BANNED = "—–―−‒‑"
 
-ROOTS = ("README.md", "SPEC.md", "docs", "recipes", "hooks", "scripts", "tests")
-SUFFIXES = {".md", ".sh", ".py", ".json"}
+ROOTS = (
+    "README.md", "SPEC.md", "CONTRIBUTING.md", "CHANGELOG.md",
+    "SECURITY.md", "CODE_OF_CONDUCT.md",
+    "docs", "recipes", "hooks", "scripts", "tests", ".github", ".claude-plugin",
+)
+SUFFIXES = {".md", ".sh", ".py", ".json", ".yml", ".yaml", ".svg"}
 
 
 def files() -> list[pathlib.Path]:
