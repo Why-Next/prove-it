@@ -1,6 +1,6 @@
 # prove-it
 
-[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -59,7 +59,7 @@ whether it may hand the work back.
 Three lines, and the third one does the work:
 
 ```
-/plugin marketplace add WhyNext/prove-it
+/plugin marketplace add Why-Next/prove-it
 /plugin install prove-it@whynext
 /prove-it:init
 ```
@@ -84,7 +84,7 @@ rather than staying quiet and letting you assume you are covered.
 The hooks are plain bash and need only `bash`, `git`, and `python3`:
 
 ```bash
-git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 
