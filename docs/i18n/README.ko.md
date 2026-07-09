@@ -1,6 +1,6 @@
 # prove-it
 
-[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -38,7 +38,7 @@ sandbox, CI 대체재, 긴 네트워크 작업을 넣는 장소로 쓰지는 마
 세 줄이면 되고, 실제 일은 세 번째 줄이 합니다:
 
 ```
-/plugin marketplace add WhyNext/prove-it
+/plugin marketplace add Why-Next/prove-it
 /plugin install prove-it@whynext
 /prove-it:init
 ```
@@ -54,7 +54,7 @@ sandbox, CI 대체재, 긴 네트워크 작업을 넣는 장소로 쓰지는 마
 훅은 평범한 bash이고 `bash`, `git`, `python3`만 있으면 됩니다:
 
 ```bash
-git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 

@@ -136,6 +136,6 @@ before the first tag. Each has a regression test in `tests/test_gate.sh`.
 - Only Claude Code exposes an end-of-turn hook that can block a turn. Other
   agents can run the gate, but not be stopped by it.
 
-[Unreleased]: https://github.com/WhyNext/prove-it/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/WhyNext/prove-it/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/WhyNext/prove-it/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Why-Next/prove-it/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Why-Next/prove-it/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Why-Next/prove-it/releases/tag/v0.1.0

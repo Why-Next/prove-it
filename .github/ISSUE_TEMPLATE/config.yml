@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security report
-    url: https://github.com/WhyNext/prove-it/blob/main/SECURITY.md
+    url: https://github.com/Why-Next/prove-it/blob/main/SECURITY.md
     about: Please email hello@whynext.app rather than opening a public issue.
   - name: A recipe for a stack we do not cover
-    url: https://github.com/WhyNext/prove-it/tree/main/recipes
+    url: https://github.com/Why-Next/prove-it/tree/main/recipes
     about: Open a pull request against recipes/ directly. No issue needed.

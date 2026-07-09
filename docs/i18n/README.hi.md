@@ -1,6 +1,6 @@
 # prove-it
 
-[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -38,7 +38,7 @@ gate एक turn में तीन बार तक वापस धकेल�
 तीन lines, और असल काम तीसरी करती है:
 
 ```
-/plugin marketplace add WhyNext/prove-it
+/plugin marketplace add Why-Next/prove-it
 /plugin install prove-it@whynext
 /prove-it:init
 ```
@@ -54,7 +54,7 @@ gate एक turn में तीन बार तक वापस धकेल�
 hooks सादा bash हैं और उन्हें केवल `bash`, `git`, और `python3` चाहिए:
 
 ```bash
-git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 
