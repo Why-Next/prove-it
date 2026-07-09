@@ -1,6 +1,6 @@
 # prove-it
 
-[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -62,7 +62,7 @@ main. Ensuite, quand l'agent modifie le dépôt et tente de s'arrêter,
 Trois lignes, et c'est la troisième qui fait le travail :
 
 ```
-/plugin marketplace add WhyNext/prove-it
+/plugin marketplace add Why-Next/prove-it
 /plugin install prove-it@whynext
 /prove-it:init
 ```
@@ -90,7 +90,7 @@ Les hooks sont de simples scripts bash et n'ont besoin que de `bash`, `git` et
 `python3` :
 
 ```bash
-git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 

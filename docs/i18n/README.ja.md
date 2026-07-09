@@ -1,6 +1,6 @@
 # prove-it
 
-[![verify](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/WhyNext/prove-it/actions/workflows/verify.yml)
+[![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](../../SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](../../LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -38,7 +38,7 @@ sandbox、CI の代替、長いネットワークジョブの置き場所とし�
 3行。そして肝心の仕事をするのは3行目だ:
 
 ```
-/plugin marketplace add WhyNext/prove-it
+/plugin marketplace add Why-Next/prove-it
 /plugin install prove-it@whynext
 /prove-it:init
 ```
@@ -54,7 +54,7 @@ sandbox、CI の代替、長いネットワークジョブの置き場所とし�
 フックは素の bash で、`bash`、`git`、`python3` だけあればよい:
 
 ```bash
-git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 
