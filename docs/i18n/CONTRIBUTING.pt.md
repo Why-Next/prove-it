@@ -76,3 +76,10 @@ evidência da spec cada verificação entrega.
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). Diga no corpo o que
 mudou e por quê. Se você corrigiu um bug, diga como o reproduziu.
+
+## Releases
+
+Mantenedores seguem [RELEASE.md](../../RELEASE.md). Uma release precisa de um
+`./verify.sh` local limpo, workflows `verify`, `codeql` e `scorecard` verdes em
+`main`, e o checksum mais a attestation de proveniência do workflow de tag. Não
+publique a partir de uma árvore não verificada.

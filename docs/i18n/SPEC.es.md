@@ -100,15 +100,41 @@ Una implementación de esta convención es una barrera. Para ser conforme debe:
 1. Ejecutar `verify.sh` desde la raíz del repositorio antes de que el turno del agente pueda
    terminar.
 2. Bloquear el turno ante una salida distinta de cero, y mostrar la salida.
-3. No hacer nada cuando `verify.sh` está ausente o no es ejecutable.
-4. No hacer nada cuando la sesión no hizo ediciones en ese repositorio.
+3. No hacer nada cuando `verify.sh` no existe como ejecutable cuando se ejecuta la
+   barrera ni existía como ejecutable al inicio de la sesión.
+4. No hacer nada cuando la sesión no cambió ese repositorio.
 5. Ofrecer un bypass explícito y localizable con grep. Un bypass silencioso enseña a la gente
    a desconfiar de la barrera; uno auditado la mantiene honesta.
+6. Nunca terminar un turno en silencio tras una verificación fallida. Una implementación que
+   deja de bloquear, por el motivo que sea, debe decirlo donde el usuario lo vea.
+
+El punto 4 pregunta qué cambió, no quién lo cambió. Una implementación que decide observando
+qué herramientas de edición invocó el agente pasará por alto un archivo reescrito por `sed`, un
+parche aplicado con `git apply`, la salida de un generador de código y una confirmación.
+Confirmar es lo más corriente que hace un agente, y una barrera que trata un árbol de trabajo
+limpio como algo que no hay que demostrar dejará pasar justo los turnos que existe para
+atrapar. Compara el repositorio contra cómo se veía cuando la sesión empezó.
+
+El punto 3 usa ambos momentos deliberadamente. El stop actual importa para que un comando
+de instalación pueda crear `verify.sh` y armar el repositorio en la misma sesión. El estado
+inicial importa para que un borrado o `chmod -x` a mitad de sesión se trate como desarmar
+la barrera, no como una renuncia honesta.
+
+El punto 6 existe porque una barrera que puede bloquear para siempre cuelga la sesión, y todo
+anfitrión acaba por forzarla a ceder. Eso está bien. Lo que no está bien es ceder de un modo
+indistinguible de pasar.
 
 No debe modificar `verify.sh`, y debe decirle al agente que debilitar `verify.sh` para
 saltarse la barrera es una violación en vez de una corrección. Este es el modo de fallo más
 probable en la práctica. Un agente que no puede pasar una comprobación, si tiene la
 oportunidad, editará la comprobación.
+
+La forma más burda de eso es quitar la comprobación. Una implementación debería anotar si
+`verify.sh` estaba presente y era ejecutable cuando la sesión empezó, y rechazar un turno que
+termina con él borrado o desarmado. Borrar el archivo entre sesiones es la renuncia de la
+sección 2 y debe seguir funcionando. Borrarlo en mitad de la sesión que estaba a punto de
+bloquear no es una renuncia, y la diferencia entre las dos solo es visible para una
+implementación que miró antes.
 
 ## 5. Niveles de conformidad
 
@@ -117,7 +143,9 @@ importa más que la ambición detrás de la convención.
 
 **Level 1, la barrera.** `verify.sh` existe, y algo se niega mecánicamente a dejar que un
 turno termine mientras falla. La implementación de referencia en `hooks/` impone esto por
-completo, y es donde todo repositorio debería empezar.
+completo, y es donde todo repositorio debería empezar. "Se niega" tiene un presupuesto: devuelve
+el turno un número acotado de veces y luego cede con una advertencia, porque el anfitrión no
+dejará que un hook bloquee para siempre.
 
 **Level 2, la evidencia.** Las comprobaciones dentro de `verify.sh` cubren los cuatro tipos
 de evidencia de la sección 3. Ninguna herramienta impone esto, esta incluida. La barrera

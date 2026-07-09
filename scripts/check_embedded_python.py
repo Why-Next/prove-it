@@ -1,13 +1,28 @@
 #!/usr/bin/env python3
-"""Fail if an embedded python block contains a character the shell would eat.
+"""Fail if embedded python can be eaten by the shell before python sees it.
 
-The hooks pass python source to `python3 -c "..."` inside a double-quoted shell
-string. A double quote in that source closes the string early. The python then
-never runs, the surrounding `2>/dev/null || true` swallows the error, and the
-feature silently does nothing. That has happened once, to the ledger, and the
-only reason it did not ship is that a test asserted the ledger file exists.
+The old rule tried to be clever. It matched `python3 -c "..."` and looked for a
+double quote inside the body. A double quote inside the body is exactly what
+ends the body, so the regex stopped there and reported the file clean while the
+shell had already torn the script in half. The check could not detect the one
+bug it was written to detect, and no repair to that regex is worth trusting,
+because the thing being parsed is shell quoting.
 
-Backticks and `$(` would be worse: the shell would execute them.
+So the shape is banned rather than inspected. Embedded python arrives through a
+heredoc with a quoted delimiter:
+
+    python3 <<'PY'
+    ...
+    PY
+
+Inside a quoted heredoc the shell performs no expansion at all: no `$`, no
+backtick, no quote handling. Nothing is left to get wrong. Arguments go in as
+argv or as environment variables, both of which the shell quotes properly.
+
+Two rules, and a file either follows them or it does not:
+
+  1. no `python -c` / `python3 -c` anywhere
+  2. every python heredoc delimiter is quoted (`<<'PY'`, not `<<PY`)
 """
 
 from __future__ import annotations
@@ -17,47 +32,56 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SHELL_FILES = sorted((ROOT / "hooks").glob("*.sh")) + [ROOT / "bin" / "prove-it"]
+SHELL_FILES = (
+    sorted((ROOT / "hooks").glob("*.sh"))
+    + sorted((ROOT / "tests").glob("*.sh"))
+    + sorted((ROOT / "recipes").glob("*.sh"))
+    + [ROOT / "bin" / "prove-it", ROOT / "verify.sh"]
+)
 
-# python3 -c "  ...  " up to the closing quote that is followed by a newline or
-# an argument. Non-greedy, so it stops at the first unescaped closing quote.
-BLOCK = re.compile(r'python3 -c "(.*?)"\s', re.S)
+DASH_C = re.compile(r"\bpython3?\s+-c\b")
+PYTHON = re.compile(r"\bpython3?\b")
 
-DANGEROUS = {
-    '"': "a double quote ends the shell string early",
-    "`": "a backtick makes the shell execute the contents",
-}
+# Every heredoc delimiter on the line, however the line is otherwise composed.
+# An unquoted delimiter means the shell expands $VAR, `cmd`, and $(cmd) inside
+# the body before python is handed it.
+HEREDOC = re.compile(r"<<-?\s*(\S+)")
+QUOTED = ("'", '"', "\\")
 
 
 def main() -> int:
-    problems = 0
+    problems: list[str] = []
+
     for path in SHELL_FILES:
         if not path.is_file():
             continue
-        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(ROOT)
 
-        for match in BLOCK.finditer(text):
-            body = match.group(1)
-            start_line = text[: match.start()].count("\n") + 1
-            for offset, ch in enumerate(body):
-                if ch in DANGEROUS:
-                    line = start_line + body[:offset].count("\n")
-                    rel = path.relative_to(ROOT)
-                    print(f"{rel}:{line}: {DANGEROUS[ch]}")
-                    problems += 1
-            if "$(" in body:
-                rel = path.relative_to(ROOT)
-                print(f"{rel}:{start_line}: $( makes the shell run a subshell")
-                problems += 1
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue  # a comment may name the thing it forbids
 
-    # A python -c block that is not double quoted at all is fine, but a heredoc
-    # would be safer still. Say so once rather than failing on it.
+            if DASH_C.search(line):
+                problems.append(
+                    f"{rel}:{lineno}: python -c lets the shell parse the source "
+                    f"before python does. Use a heredoc: python3 <<'PY'")
+
+            if not PYTHON.search(line):
+                continue
+            for delimiter in HEREDOC.findall(line):
+                if not delimiter.startswith(QUOTED):
+                    problems.append(
+                        f"{rel}:{lineno}: heredoc delimiter {delimiter} is not "
+                        f"quoted, so the shell expands the python source. "
+                        f"Write <<'{delimiter}'")
+
     if problems:
-        print(f"\ncheck_embedded_python: {problems} problem(s). Use single "
-              f"quotes inside the block, or switch to a heredoc.", file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem}")
+        print(f"\ncheck_embedded_python: {len(problems)} problem(s).", file=sys.stderr)
         return 1
 
-    print("check_embedded_python: embedded python survives the shell")
+    print("check_embedded_python: embedded python reaches python unmodified")
     return 0
 
 

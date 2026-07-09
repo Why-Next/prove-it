@@ -1,0 +1,8 @@
+# Require an owner review for the files that define the convention, the gate,
+# and the release boundary. Keep this small until there is a maintainer team.
+* @WhyNext
+
+/SPEC.md @WhyNext
+/hooks/ @WhyNext
+/.github/workflows/ @WhyNext
+/.claude-plugin/ @WhyNext

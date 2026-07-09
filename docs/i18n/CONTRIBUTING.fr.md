@@ -81,3 +81,10 @@ types de preuves de la spec chaque vérification livre.
 Commits conventionnels (`feat:`, `fix:`, `docs:`, `chore:`). Dites dans le corps
 ce qui a changé et pourquoi. Si vous avez corrigé un bug, dites comment vous
 l'avez reproduit.
+
+## Releases
+
+Les mainteneurs suivent [RELEASE.md](../../RELEASE.md). Une release exige un
+`./verify.sh` local propre, les workflows `verify`, `codeql` et `scorecard` au
+vert sur `main`, ainsi que la somme de contrôle et l'attestation de provenance
+du workflow de tag. Ne publiez pas depuis un arbre non vérifié.

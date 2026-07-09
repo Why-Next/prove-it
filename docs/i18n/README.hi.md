@@ -21,11 +21,17 @@
 
 Coding agent बताते हैं कि tests pass हो गए, जबकि उन्होंने उन्हें कभी चलाया ही नहीं, और यह कि कोई bug ठीक हो गया, जबकि उन्होंने उसे कभी reproduce ही नहीं किया। agent के पास इसकी तुलना करने का कोई तरीका नहीं है कि उसने क्या किया बनाम उसका इरादा क्या था, इसलिए वह इरादे की रिपोर्ट कर देता है। यह एक design गुण है, कोई चारित्रिक दोष नहीं, और कोई भी prompt इसे ठीक नहीं करता।
 
-`prove-it` उस रिपोर्ट को एक check में बदल देता है। अपनी repository की root पर एक `verify.sh` रखें। जब agent अपनी turn समाप्त करने की कोशिश करता है, तो एक hook उस script को चलाता है, और एक non-zero exit turn को तब तक खुला रखता है जब तक कारण ठीक न हो जाए।
+`prove-it` उस रिपोर्ट को एक check में बदल देता है। अपनी repository की root पर एक `verify.sh` रखें। जब agent अपनी turn समाप्त करने की कोशिश करता है, तो एक hook उस script को चलाता है, और एक non-zero exit agent को रुकने देने के बजाय वापस काम पर भेज देता है।
 
 ![prove-it उस agent को block करता है जो दावा करता है कि वह पूरा कर चुका है](../../docs/demo.svg)
 
-मेरे अपने इस्तेमाल में, किसी failing gate से टकराने वाली turns में से आधे से कुछ कम turns में agent यह मान लेता है कि वह पूरा नहीं हुआ था। वरना वे turns "done" शब्द के साथ समाप्त हो जातीं।
+gate एक turn में तीन बार तक वापस धकेलता है और फिर हार मान लेता है, क्योंकि जो hook कभी हार नहीं मानता वह session को अटका देता है। हार मानना pass होने जैसा नहीं है, इसलिए आखिर में आप "done" शब्द के बजाय एक चेतावनी देखते हैं कि turn बिना verify हुए समाप्त हो गई। तीन एक ऐसी संख्या है जिसे आप बदल सकते हैं, और इसमें से कुछ भी यह दावा नहीं है कि आपका agent gate को पार नहीं कर सकता। यह यह दावा है कि वह gate को चुपचाप पार नहीं कर सकता।
+
+इसे तब इस्तेमाल करें जब repository में कोई local command हो जो agent के काम लौटाने से पहले सच होनी चाहिए: tests, type checks, lint, generated-file checks, migration dry runs, या छोटा smoke test जो साबित करे कि bug चला गया। `prove-it` उन repositories में सबसे उपयोगी है जहाँ agent code edit करता है और उसी thread में "done" कहता है।
+
+इसे sandbox, CI replacement, या लंबे network jobs की जगह के रूप में इस्तेमाल न करें। अगर किसी check को secrets, production access, या लगभग एक minute से ज़्यादा समय चाहिए, तो उसे CI में रखें और `verify.sh` में वही local proof रखें जिसे agent काम करते समय चला सके।
+
+पहले दिन का flow जानबूझकर छोटा है। Plugin install करें, `/prove-it:init` चलाएँ, generated `git diff --check` को ही active check रहने दें, फिर एक real command को हाथ से pass होते देखने के बाद चालू करें। इसके बाद agent repository बदलकर रुकना चाहे, तो `verify.sh` तय करता है कि वह काम वापस दे सकता है या नहीं।
 
 ## इंस्टॉल
 
@@ -59,7 +65,8 @@ git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
 ```
 repository   /home/you/src/api
 verify.sh    present and executable
-working tree dirty, so the gate would run on the next stop
+working tree dirty
+blocks       up to 3 per turn, then it yields with a warning
 state        /home/you/.local/state/prove-it
 ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
@@ -76,18 +83,23 @@ ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 
 gate तब तक चुप रहता है जब तक ये सब सच न हों:
 
-- इस session ने इस repository में files संपादित कीं
+- इस session ने इस repository को बदला
 - repository की root पर एक executable `verify.sh` मौजूद है
-- working tree में uncommitted बदलाव हैं
 - यह ठीक यही tree state पहले से pass नहीं हुई है
+
+"बदला" का जवाब repository देती है, न कि इसका कोई लॉग कि कौन-से tools चले। session की शुरुआत में hook दर्ज कर लेता है कि tree कैसी दिखती थी, और हर stop पर वह पूछता है कि tree अब भी वैसी ही दिखती है या नहीं। `sed` से दोबारा लिखी गई कोई file, `git apply` से लगाया गया कोई patch, किसी code generator से निकली कोई file, और एक commit - ये सब बदलाव हैं, क्योंकि इन सभी से tree बदलती है। जिस session ने केवल पढ़ा वह कुछ भी नहीं गिना जाता, उस repository में भी जो खुलते समय पहले से गंदी थी।
 
 आखिरी शर्त का मतलब है कि pass होने वाली tree हर stop पर नहीं, बल्कि एक ही बार verify होती है। जब verification fail होता है, तो agent को output की आखिरी बीस लाइनें दिखती हैं, जो आमतौर पर उसके लिए कारण ठीक करने के वास्ते काफी होती हैं, बिना यह बताए कि क्या गलत हुआ।
 
-`PROVE_IT_SKIP=1` जान-बूझकर gate को पार कर जाता है। `verify.sh` को delete करने से यह हमेशा के लिए बंद हो जाता है। दोनों escape hatch जान-बूझकर रखे गए हैं: लोग ऐसे gate के इर्द-गिर्द रास्ता निकाल लेते हैं जिसे वे हटा नहीं सकते।
+`PROVE_IT_SKIP=1` जान-बूझकर gate को पार कर जाता है। sessions के बीच `verify.sh` को delete करने से यह हमेशा के लिए बंद हो जाता है। दोनों escape hatch जान-बूझकर रखे गए हैं: लोग ऐसे gate के इर्द-गिर्द रास्ता निकाल लेते हैं जिसे वे हटा नहीं सकते। `PROVE_IT_MAX_BLOCKS` यह तय करता है कि एक turn को कितनी बार वापस भेजा जा सकता है, और `0` gate को कभी block किए बिना रिपोर्ट कराता है।
 
 ## जब agent gate को बदल देता है
 
-सबसे कठिन failure mode कोई अविश्वसनीय check नहीं है। यह एक ऐसा agent है जो `verify.sh` को pass नहीं करा पाता और इसके बजाय `verify.sh` को ही बदल देता है। failure संदेश उसे ऐसा न करने को कहता है, और [SPEC.md](../../SPEC.md) इसे fix नहीं बल्कि एक उल्लंघन कहती है, लेकिन इनमें से कोई भी प्रवर्तन नहीं है। अपने diffs पढ़ें। spec में diff साक्ष्य इसी के लिए है।
+सबसे कठिन failure mode कोई अविश्वसनीय check नहीं है। यह एक ऐसा agent है जो `verify.sh` को pass नहीं करा पाता और इसके बजाय `verify.sh` को ही बदल देता है।
+
+इसका सबसे सस्ता रूप gate को सीधे निहत्था कर देना है, इसलिए gate इसे अस्वीकार कर देता है। hook दर्ज कर लेता है कि session शुरू होते समय `verify.sh` executable था या नहीं, और जो session उसे delete किए हुए या उसका executable bit हटाए हुए समाप्त होती है उसे block किया जाता है, बताया जाता है कि उसने क्या किया, और बताया जाता है कि अगर उसका यही इरादा था तो ईमानदारी से बाहर कैसे निकला जाए। sessions के बीच `verify.sh` को delete करना अब भी एक opt-out है और अब भी एक ही command लेता है।
+
+जो चीज़ अप्रवर्तित रहती है वह है सूक्ष्म रूप: एक ऐसा agent जो `verify.sh` को executable बनाए रखता है और चुपचाप उसके भीतर के checks को खोखला कर देता है। failure संदेश उसे ऐसा न करने को कहता है, और [SPEC.md](../../SPEC.md) इसे fix नहीं बल्कि एक उल्लंघन कहती है, लेकिन इनमें से कोई भी प्रवर्तन नहीं है। अपने diffs पढ़ें। spec में diff साक्ष्य इसी के लिए है।
 
 ## `verify.sh` कन्वेंशन
 
@@ -100,6 +112,8 @@ gate तब तक चुप रहता है जब तक ये सब स
 gate एक ही चीज़ लागू करता है: कि turn समाप्त होने से पहले `verify.sh` ने zero लौटाया। उस zero का कोई मतलब है या नहीं, यह पूरी तरह उन checks पर निर्भर करता है जो आपने लिखे। केवल `exit 0` वाला `verify.sh` इस gate को pass कर जाता है और कुछ भी साबित नहीं करता।
 
 spec इसे Level 1 कहती है। Level 2 यह है कि आपके checks असली साक्ष्य के विरुद्ध जोर देते हैं या नहीं, और कोई tool इसे आपके लिए verify नहीं कर सकता, यह वाला भी शामिल।
+
+तीन और सीमाएँ, साफ-साफ बताई गई हैं क्योंकि वरना आप इन्हें किसी बुरे मौके पर पाएँगे। gate `PROVE_IT_MAX_BLOCKS` अस्वीकारों के बाद हार मान लेता है, इसलिए एक अड़ा हुआ agent अपनी turn के अंत तक पहुँच ही जाता है; जो वह नहीं कर सकता वह है वहाँ चुपचाप पहुँचना। जिन files को आपका `.gitignore` बाहर रखता है वे बदलाव का पता लगाने के लिए अदृश्य होती हैं, इसलिए ऐसा `verify.sh` जो किसी ignored `.env` को पढ़ता है, जब केवल वही file बदली हो तो skip हो सकता है। और जो session उस repository के बाहर शुरू होती है जिसे वह बाद में संपादित करती है, उसके पास तुलना करने के लिए कोई baseline नहीं होती, जो gate को इस कमज़ोर test पर वापस गिरा देता है कि working tree गंदी है या नहीं।
 
 ## रेसिपी
 
@@ -127,13 +141,19 @@ hook जोड़ना आसान हिस्सा है। असली �
 
 ## यह repo खुद को gate करता है
 
-`prove-it` के पास एक `verify.sh` है, और यह जो चलाता है उसका एक हिस्सा खुद gate है, जो एक temporary directory में असली git repositories के विरुद्ध चलता है: एक failing check block करता है, एक passing check अनुमति देता है, एक read-only session को छोड़ दिया जाता है, एक साफ tree skip हो जाती है, bypass काम करता है।
+`prove-it` के पास एक `verify.sh` है, और यह जो चलाता है उसका एक हिस्सा खुद gate है, जो एक temporary directory में असली git repositories के विरुद्ध चलता है: एक failing check block करता है, एक passing check अनुमति देता है, एक read-only session को छोड़ दिया जाता है, commit के बाद साफ tree को no work नहीं माना जाता, bypass काम करता है।
 
 ```bash
 ./verify.sh
 ```
 
-CI उसी script को Linux और macOS पर चलाता है, साथ ही एक अलग job जो साबित करता है कि gate अब भी उस repository को block करता है जिसके checks fail होते हैं।
+CI उसी script को Linux और macOS पर चलाता है, साथ ही एक अलग job जो साबित करता है कि gate अब भी उस repository को block करता है जिसके checks fail होते हैं। Repository CodeQL, OpenSSF Scorecard, और tag release workflow भी चलाती है, जो source को checksum और GitHub provenance attestation के साथ package करता है।
+
+## Project trust
+
+जिन repositories पर आपको भरोसा नहीं है उनमें इसे इस्तेमाल करने से पहले [SECURITY.md](../../SECURITY.md) पढ़ें। `prove-it` repository-owned `verify.sh` चलाता है; यह guardrail है, sandbox नहीं।
+
+Release steps [RELEASE.md](../../RELEASE.md) में हैं, जिनमें verification, workflow status, checksums, और provenance attestation की checklist शामिल है। Support boundaries [SUPPORT.md](../../SUPPORT.md) में हैं।
 
 ## योगदान
 

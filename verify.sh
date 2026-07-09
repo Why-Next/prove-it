@@ -13,40 +13,54 @@ for f in hooks/*.sh recipes/*.sh tests/*.sh bin/prove-it verify.sh; do
 done
 
 # Cross-check: shellcheck is an independent source from bash's own parser.
+# recipes/ is in the list because it is the code people copy into their own
+# repositories, which makes it the last place a warning should be tolerated.
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -S warning hooks/*.sh bin/prove-it verify.sh tests/*.sh
+    shellcheck -S warning hooks/*.sh bin/prove-it verify.sh tests/*.sh recipes/*.sh
 else
     echo "verify.sh: shellcheck not installed, skipping static analysis"
 fi
 
-# A double quote inside an embedded `python3 -c "..."` block ends the shell
-# string, and the error goes to /dev/null. Static check, because the symptom is
-# a feature that quietly stops working.
+# Embedded python must reach python the way it was written. `python3 -c "..."`
+# lets the shell parse it first, and the symptom of getting that wrong is a
+# feature that quietly stops working rather than an error anyone sees.
 python3 scripts/check_embedded_python.py
 
 # Every JSON file we ship has to parse, or the install silently fails.
 for f in hooks/settings.example.json hooks/hooks.json \
          .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
-    python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+    PI_FILE="$f" python3 <<'PY'
+import json, os
+with open(os.environ["PI_FILE"], encoding="utf-8") as fh:
+    json.load(fh)
+PY
 done
 
 # The plugin manifests, the hook targets they name, and the version they claim.
 python3 scripts/check_plugin.py
+python3 scripts/check_project_hygiene.py
 
-# The CI workflow has to parse, or a green local run means nothing.
-python3 -c "
-import sys
+# The CI workflows have to parse and follow the repository security policy, or a
+# green local run means nothing.
+python3 <<'PY'
+import pathlib, sys
 try:
     import yaml
 except ImportError:
-    print('verify.sh: pyyaml not installed, skipping workflow parse')
+    print("verify.sh: pyyaml not installed, skipping workflow parse")
     sys.exit(0)
-yaml.safe_load(open('.github/workflows/verify.yml'))
-"
+for path in sorted(pathlib.Path(".github/workflows").glob("*.yml")):
+    with open(path, encoding="utf-8") as fh:
+        yaml.safe_load(fh)
+PY
+python3 scripts/check_workflows.py
 
 # The README's demo image has to be well-formed, or GitHub renders a broken icon
 # where the pitch should be.
-python3 -c "import xml.etree.ElementTree as ET; ET.parse('docs/demo.svg')"
+python3 <<'PY'
+import xml.etree.ElementTree as ET
+ET.parse("docs/demo.svg")
+PY
 
 # Prose hygiene across every language: plain hyphens only.
 python3 scripts/check_no_long_dash.py

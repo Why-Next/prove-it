@@ -27,14 +27,34 @@ carattere, e nessun prompt lo risolve.
 
 `prove-it` trasforma il resoconto in un controllo. Metti un `verify.sh` alla
 radice del repository. Quando l'agente prova a terminare il turno, un hook esegue
-lo script, e un'uscita diversa da zero tiene aperto il turno finché la causa non
-è risolta.
+lo script, e un'uscita diversa da zero rimanda l'agente al lavoro invece di
+lasciarlo fermare.
 
 ![prove-it blocca un agente che dichiara di aver finito](../../docs/demo.svg)
 
-Nel mio uso, poco meno della metà dei turni che incontrano un gate fallito
-tornano con l'agente che ammette di non aver finito. Quei turni sarebbero
-altrimenti finiti con la parola "fatto".
+Il gate insiste fino a tre volte per turno e poi cede, perché un hook che non
+cede mai blocca la sessione. Cedere non è lo stesso che passare, quindi l'ultima
+cosa che vedi è un avviso che il turno è finito non verificato anziché la parola
+"fatto". Tre è un numero che puoi cambiare, e niente di tutto questo è
+un'affermazione che il tuo agente non possa superare il gate. È un'affermazione
+che non può superarlo in silenzio.
+
+Usalo quando un repository ha un comando locale che deve essere vero prima che
+un agente restituisca il lavoro: test, controlli di tipo, lint, controlli sui
+file generati, dry run di migrazione o un piccolo smoke test che prova che il bug
+è sparito. `prove-it` è più utile nei repository in cui un agente modifica codice
+e dice "fatto" nello stesso thread.
+
+Non usarlo come sandbox, sostituto della CI o posto per job lunghi con rete. Se
+un controllo richiede secrets, accesso alla produzione o più di circa un minuto,
+mettilo in CI e tieni `verify.sh` alla prova locale che l'agente può eseguire
+mentre sta ancora lavorando.
+
+Il flusso del primo giorno è piccolo per scelta. Installa il plugin, esegui
+`/prove-it:init`, lascia il `git diff --check` generato come unico controllo
+attivo, poi attiva un comando reale solo dopo averlo visto passare a mano. Da
+quel momento, quando l'agente cambia il repository e prova a fermarsi,
+`verify.sh` decide se può restituire il lavoro.
 
 ## Installazione
 
@@ -83,7 +103,8 @@ e ti dice cosa lo blocca se non lo farebbe:
 ```
 repository   /home/you/src/api
 verify.sh    present and executable
-working tree dirty, so the gate would run on the next stop
+working tree dirty
+blocks       up to 3 per turn, then it yields with a warning
 state        /home/you/.local/state/prove-it
 ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
@@ -109,28 +130,47 @@ non è successo nulla.
 
 Il gate resta silenzioso a meno che non valgano tutte queste condizioni:
 
-- questa sessione ha modificato file in questo repository
+- questa sessione ha modificato questo repository
 - esiste un `verify.sh` eseguibile alla radice del repository
-- l'albero di lavoro ha modifiche non ancora committate
 - questo stato esatto dell'albero non è già passato
+
+"Modificato" lo risponde il repository, non un registro di quali strumenti sono
+stati eseguiti. All'inizio di una sessione l'hook registra com'era l'albero, e a
+ogni stop chiede se l'albero abbia ancora quell'aspetto. Un file riscritto da
+`sed`, una patch applicata con `git apply`, un file prodotto da un generatore di
+codice e un commit sono tutti modifiche, perché tutti cambiano l'albero. Una
+sessione che ha solo letto conta come nulla, anche in un repository che era già
+sporco quando è stata aperta.
 
 L'ultima condizione fa sì che un albero che passa venga verificato una volta sola
 invece che a ogni stop. Quando la verifica fallisce, l'agente vede le ultime
 venti righe dell'output, di solito abbastanza per correggere la causa senza che
 gli venga detto cosa è andato storto.
 
-`PROVE_IT_SKIP=1` supera il gate di proposito. Cancellare `verify.sh` lo
-disattiva del tutto. Entrambe le vie di fuga sono volute: le persone aggirano un
-gate che non possono rimuovere.
+`PROVE_IT_SKIP=1` supera il gate di proposito. Cancellare `verify.sh` tra una
+sessione e l'altra lo disattiva del tutto. Entrambe le vie di fuga sono volute:
+le persone aggirano un gate che non possono rimuovere. `PROVE_IT_MAX_BLOCKS`
+imposta quante volte un singolo turno può essere rimandato indietro, e `0` fa sì
+che il gate segnali senza mai bloccare.
 
 ## Quando l'agente modifica il gate
 
 La modalità di fallimento più difficile non è un controllo instabile. È un agente
-che non riesce a far passare `verify.sh` e allora modifica `verify.sh`. Il
-messaggio di errore gli dice di non farlo, e [SPEC.md](../../SPEC.md) lo
-definisce una violazione anziché una correzione, ma nessuna delle due cose è
-un'imposizione. Leggi i tuoi diff. È a questo che serve la prova per diff nella
-specifica.
+che non riesce a far passare `verify.sh` e allora modifica `verify.sh`.
+
+La versione più economica è disarmare il gate del tutto, e allora il gate la
+rifiuta. L'hook registra se `verify.sh` era eseguibile quando la sessione è
+iniziata, e una sessione che finisce con il file cancellato o con il bit di
+esecuzione rimosso viene bloccata, le viene detto cosa ha fatto, e le viene detto
+come rinunciare in modo onesto se era questo che intendeva. Cancellare
+`verify.sh` tra una sessione e l'altra resta una rinuncia e richiede ancora un
+solo comando.
+
+Ciò che resta non imposto è la versione sottile: un agente che tiene `verify.sh`
+eseguibile e ne svuota in silenzio i controlli. Il messaggio di errore gli dice
+di non farlo, e [SPEC.md](../../SPEC.md) lo definisce una violazione anziché una
+correzione, ma nessuna delle due cose è un'imposizione. Leggi i tuoi diff. È a
+questo che serve la prova per diff nella specifica.
 
 ## La convenzione `verify.sh`
 
@@ -155,6 +195,15 @@ gate e non dimostra nulla.
 La specifica lo chiama Level 1. Il Level 2 è se i tuoi controlli si verificano
 contro prove reali, e nessuno strumento può verificarlo al posto tuo, questo
 incluso.
+
+Altri tre confini, detti chiaramente perché altrimenti li scoprirai in un brutto
+momento. Il gate cede dopo `PROVE_IT_MAX_BLOCKS` rifiuti, quindi un agente
+ostinato raggiunge la fine del suo turno; ciò che non può fare è arrivarci in
+silenzio. I file che il tuo `.gitignore` esclude sono invisibili al rilevamento
+delle modifiche, quindi un `verify.sh` che legge un `.env` ignorato può essere
+saltato quando è cambiato solo quel file. E una sessione che inizia fuori dal
+repository che poi modifica non ha alcuna baseline con cui confrontarsi, il che
+riporta il gate al test più debole di se l'albero di lavoro è sporco.
 
 ## Ricette
 
@@ -194,14 +243,28 @@ così come `prove-it ledger` da riga di comando.
 `prove-it` ha un `verify.sh`, e parte di ciò che esegue è il gate stesso, contro
 repository git reali in una directory temporanea: un controllo che fallisce
 blocca, un controllo che passa lascia procedere, una sessione di sola lettura
-viene lasciata in pace, un albero pulito viene saltato, il bypass funziona.
+viene lasciata in pace, un albero pulito dopo un commit non viene scambiato per
+assenza di lavoro, il bypass funziona.
 
 ```bash
 ./verify.sh
 ```
 
 La CI esegue lo stesso script su Linux e macOS, più un job separato che dimostra
-che il gate blocca ancora un repository i cui controlli falliscono.
+che il gate blocca ancora un repository i cui controlli falliscono. Il
+repository esegue anche CodeQL, OpenSSF Scorecard e un workflow di release su
+tag che impacchetta il sorgente con checksum e attestazione di provenienza
+GitHub.
+
+## Fiducia nel progetto
+
+Leggi [SECURITY.md](../../SECURITY.md) prima di usarlo in repository di cui non
+ti fidi. `prove-it` esegue il `verify.sh` di proprietà del repository; è un
+guardrail, non una sandbox.
+
+I passi di release sono in [RELEASE.md](../../RELEASE.md), inclusa la checklist
+per verifica, stato dei workflow, checksum e attestazione di provenienza. I
+confini del supporto sono in [SUPPORT.md](../../SUPPORT.md).
 
 ## Contribuire
 

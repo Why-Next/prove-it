@@ -11,20 +11,40 @@ che accetti già quando esegui `npm install` o apri un progetto con un `Makefile
 Leggi un `verify.sh` sconosciuto prima di lasciare che un agente lavori nel
 repository che lo contiene, come leggeresti uno script `postinstall` sconosciuto.
 
-Il gate viene eseguito solo quando la sessione ha modificato file **in quello
-stesso repository**, l'albero di lavoro è sporco, e un `verify.sh` eseguibile
-esiste alla radice del repo. Clonare e leggere un repository non lo attiva mai, e
-modificare un repository non provoca mai l'esecuzione del `verify.sh` di un altro
-repository.
+Il gate viene eseguito solo quando la sessione ha modificato **quello stesso
+repository** e un `verify.sh` eseguibile esiste alla sua radice. Clonare e
+leggere un repository non lo attiva mai, e modificare un repository non provoca
+mai l'esecuzione del `verify.sh` di un altro repository.
+
+`prove-it doctor` è l'eccezione, ed è voluta: gli hai chiesto di eseguire il
+gate, quindi esegue `verify.sh` immediatamente, in qualsiasi repository ti trovi.
+Non eseguirlo dentro un repository il cui `verify.sh` non hai letto.
+
+Niente di tutto questo è una sandbox. Gli hook e la loro contabilità girano come
+te, e così anche la shell dell'agente, quindi un agente deciso a sconfiggere il
+gate potrebbe cancellare la directory di stato e poi disarmare `verify.sh`.
+`prove-it` è una barriera di protezione contro un agente che sbaglia con
+sicurezza, ed è quello che hai. Non è un confine contro un agente ostile. Un
+controllo che un agente ostile non può raggiungere deve girare da qualche parte
+dove non può raggiungerlo, e quel posto è la CI.
 
 ## Cosa scrive su disco
 
-Due marcatori, entrambi in una directory privata creata con modalità `0700`:
-`$XDG_STATE_HOME/prove-it/`, oppure `~/.local/state/prove-it/` quando non è
-impostata. Puoi ridefinirla con `PROVE_IT_STATE_DIR`. Nulla viene scritto nella
-`/tmp` condivisa, perché questi nomi di file derivano dal percorso del repository
-e sono quindi prevedibili, e un nome prevedibile in una directory scrivibile da
-chiunque è un bersaglio per symlink.
+Piccoli file di servizio, tutti in una directory privata creata con modalità
+`0700`: `$XDG_STATE_HOME/prove-it/`, oppure `~/.local/state/prove-it/` quando non
+è impostata. Puoi ridefinirla con `PROVE_IT_STATE_DIR`. Registrano com'era
+l'albero quando una sessione è iniziata, se il gate era armato in quel momento, a
+quali repository una sessione ha scritto, quali stati dell'albero sono già
+passati, e quante volte il turno corrente è stato rimandato indietro. Ciascuno
+contiene un checksum o un piccolo intero, mai il contenuto dei file. Nulla viene
+scritto nella `/tmp` condivisa, perché questi nomi di file derivano dal percorso
+del repository e sono quindi prevedibili, e un nome prevedibile in una directory
+scrivibile da chiunque è un bersaglio per symlink.
+
+L'identificatore di sessione arriva nel payload JSON dell'hook e finisce dentro
+uno di quei nomi di file, quindi viene ridotto a lettere, cifre, trattino e
+trattino basso prima di essere usato. Un payload non è una fonte affidabile di
+componenti di percorso.
 
 Il ledger opzionale (`PROVE_IT_LEDGER=1`, **disattivato per impostazione
 predefinita**) aggiunge una riga JSON per ogni falso completamento intercettato a
@@ -35,7 +55,8 @@ predefinita**) aggiunge una riga JSON per ogni falso completamento intercettato 
   caratteri e tratto dal tuo transcript locale, quindi può contenere qualsiasi
   cosa fosse nella tua conversazione
 - il percorso assoluto del repository
-- il codice di uscita e le ultime cinque righe dell'output del tuo `verify.sh`
+- il codice di uscita, e le righe dell'output del tuo `verify.sh` che nominano un
+  fallimento
 - un timestamp
 
 Trattalo come dati di conversazione. Niente in questo progetto lo rilegge o lo

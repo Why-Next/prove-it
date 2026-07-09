@@ -6,13 +6,19 @@
 
 यह व्यवहार इसमें कोई दोष नहीं बल्कि design है, और जोखिम वही है जिसे आप `npm install` चलाते समय या किसी `Makefile` वाले project को खोलते समय पहले से स्वीकार करते हैं। किसी अनजान `verify.sh` को उस repository में agent से काम कराने से पहले पढ़ें जिसमें वह मौजूद है, ठीक वैसे ही जैसे आप किसी अनजान `postinstall` script को पढ़ेंगे।
 
-gate केवल तभी चलता है जब session ने **उसी repository में** files संपादित की हों, working tree गंदी हो, और repo की root पर एक executable `verify.sh` मौजूद हो। किसी repository को clone और पढ़ना इसे कभी trigger नहीं करता, और एक repository को संपादित करना कभी किसी दूसरी repository के `verify.sh` को नहीं चलाता।
+gate केवल तभी चलता है जब session ने **उसी repository को** बदला हो और उसकी root पर एक executable `verify.sh` मौजूद हो। किसी repository को clone और पढ़ना इसे कभी trigger नहीं करता, और एक repository को बदलना कभी किसी दूसरी repository के `verify.sh` को नहीं चलाता।
+
+`prove-it doctor` इसका अपवाद है, और यह जान-बूझकर है: आपने इससे gate चलाने को कहा, इसलिए यह `verify.sh` को तुरंत चला देता है, चाहे आप किसी भी repository में खड़े हों। जिस repository के `verify.sh` को आपने पढ़ा नहीं है, उसके भीतर इसे न चलाएँ।
+
+इसमें से कुछ भी sandbox नहीं है। hooks और उनका हिसाब-किताब आपके रूप में चलते हैं, और agent का shell भी, इसलिए जो agent gate को हराने पर उतर आया हो, वह state directory को मिटा सकता है और फिर `verify.sh` को निरस्त्र कर सकता है। `prove-it` उस agent के विरुद्ध एक guardrail है जो आत्मविश्वास के साथ गलत है, और आपके पास यही वाला है। यह किसी विरोधी agent के विरुद्ध एक सीमा नहीं है। जिस जाँच तक कोई शत्रुतापूर्ण agent पहुँच न सके, उसे कहीं ऐसी जगह चलना होगा जहाँ वह पहुँच न सके, और वह जगह CI है।
 
 ## यह disk पर क्या लिखता है
 
-दो markers, दोनों mode `0700` में बनी एक निजी directory में:
+छोटी bookkeeping files, सभी mode `0700` में बनी एक निजी directory में:
 `$XDG_STATE_HOME/prove-it/`, या जब वह अनसेट हो तो `~/.local/state/prove-it/`।
-`PROVE_IT_STATE_DIR` से इसे override करें। साझा `/tmp` में कुछ नहीं लिखा जाता, क्योंकि ये filenames repository path से बनते हैं और इसलिए predictable होते हैं, और किसी world-writable directory में एक predictable नाम एक symlink target होता है।
+`PROVE_IT_STATE_DIR` से इसे override करें। ये दर्ज करती हैं कि session शुरू होते समय tree कैसी दिखती थी, उस क्षण gate armed था या नहीं, किसी session ने किन repositories में लिखा है, कौन-सी tree states पहले से pass हो चुकी हैं, और मौजूदा turn को कितनी बार वापस भेजा गया है। हर एक में एक checksum या एक छोटा integer होता है, कभी file की सामग्री नहीं। साझा `/tmp` में कुछ नहीं लिखा जाता, क्योंकि ये filenames repository path से बनते हैं और इसलिए predictable होते हैं, और किसी world-writable directory में एक predictable नाम एक symlink target होता है।
+
+session पहचानकर्ता hook के JSON payload में आता है और उन्हीं filenames में से एक के भीतर पहुँच जाता है, इसलिए उपयोग से पहले इसे घटाकर अक्षरों, अंकों, dash, और underscore तक सीमित कर दिया जाता है। कोई payload path के हिस्सों का भरोसेमंद स्रोत नहीं है।
 
 वैकल्पिक ledger (`PROVE_IT_LEDGER=1`, **डिफ़ॉल्ट रूप से बंद**) हर पकड़ी गई झूठी completion के लिए `~/.prove-it/ledger.jsonl` में एक JSON line जोड़ता है, जो एक `0700` directory के भीतर mode `0600` में बनी होती है। हर line में यह होता है:
 
@@ -20,7 +26,7 @@ gate केवल तभी चलता है जब session ने **उस�
   तक काटा हुआ और आपके स्थानीय transcript से लिया गया, इसलिए इसमें आपकी बातचीत की
   कोई भी चीज़ हो सकती है
 - repository का absolute path
-- exit code और आपके `verify.sh` output की आखिरी पाँच लाइनें
+- exit code, और आपके `verify.sh` output की वे लाइनें जो किसी विफलता का नाम लेती हैं
 - एक timestamp
 
 इसे बातचीत के डेटा की तरह मानें। इस project में कुछ भी इसे वापस नहीं पढ़ता या कहीं नहीं भेजता, पर यह एक साधारण file बनी रहती है, इसलिए आपके backups इसे copy कर लेंगे और आपके home directory तक पढ़ने की पहुँच रखने वाला कोई भी इसे खोल सकता है।

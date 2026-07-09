@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name to package, for example v0.2.0"
+        required: true
+
+permissions:
+  attestations: write
+  contents: read
+  id-token: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve release tag
+        id: ref
+        run: |
+          set -eu
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="${{ github.event.inputs.tag }}"
+            git rev-parse "$tag" >/dev/null
+          fi
+          case "$tag" in
+            v*) ;;
+            *) echo "tag must start with v" >&2; exit 1 ;;
+          esac
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Verify before packaging
+        run: ./verify.sh
+
+      - name: Build source package
+        run: |
+          set -eu
+          mkdir -p dist
+          tag="${{ steps.ref.outputs.tag }}"
+          git archive --format=tar.gz --prefix="prove-it-${tag#v}/" \
+            -o "dist/prove-it-${tag}.tar.gz" "$tag"
+          shasum -a 256 "dist/prove-it-${tag}.tar.gz" \
+            > "dist/prove-it-${tag}.tar.gz.sha256"
+
+      - name: Attest source package
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: "dist/prove-it-${{ steps.ref.outputs.tag }}.tar.gz"
+
+      - name: Upload release package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: "prove-it-${{ steps.ref.outputs.tag }}"
+          path: dist/*

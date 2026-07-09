@@ -78,3 +78,10 @@ Beweisarten der Spec jeder Check liefert.
 Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`). Sag im Rumpf, was
 sich geändert hat und warum. Wenn du einen Fehler behoben hast, sag, wie du ihn
 reproduziert hast.
+
+## Releases
+
+Maintainer folgen [RELEASE.md](../../RELEASE.md). Ein Release braucht ein
+sauberes lokales `./verify.sh`, grüne `verify`-, `codeql`- und `scorecard`-
+Workflows auf `main`, sowie die Prüfsumme und Provenance-Attestation aus dem
+Tag-Workflow. Veröffentliche nicht aus einem unverifizierten Baum.

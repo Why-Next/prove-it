@@ -99,15 +99,42 @@ An implementation of this convention is a gate. To conform it must:
 
 1. Run `verify.sh` from the repository root before the agent's turn can end.
 2. Block the turn on a non-zero exit, and surface the output.
-3. Do nothing when `verify.sh` is absent or not executable.
-4. Do nothing when the session made no edits to that repository.
+3. Do nothing when `verify.sh` neither exists as executable when the gate runs
+   nor existed as executable at the start of the session.
+4. Do nothing when the session did not change that repository.
 5. Provide an explicit, greppable bypass. A silent bypass teaches people to
    distrust the gate; an audited one keeps it honest.
+6. Never end a turn silently after a failed verification. An implementation that
+   stops blocking, for any reason, must say so where the user will see it.
+
+Point 4 asks what changed, not who changed it. An implementation that decides by
+watching which editing tools the agent called will miss a file rewritten by
+`sed`, a patch applied with `git apply`, output from a code generator, and a
+commit. Committing is the most ordinary thing an agent does, and a gate that
+treats a clean working tree as nothing to prove will wave through the very turns
+it exists to catch. Compare the repository against what it looked like when the
+session began.
+
+Point 3 uses both moments deliberately. The current stop matters so an
+installation command can create `verify.sh` and arm the repository in the same
+session. The starting state matters so a mid-session deletion or `chmod -x` is
+treated as disarming the gate rather than opting out honestly.
+
+Point 6 exists because a gate that can block forever hangs the session, and
+every host eventually forces it to yield. That is fine. What is not fine is
+yielding in a way indistinguishable from passing.
 
 It must not modify `verify.sh`, and it must tell the agent that weakening
 `verify.sh` to get past the gate is a violation rather than a fix. This is the
 likeliest failure mode in practice. An agent that cannot pass a check will, given
 the opportunity, edit the check.
+
+The crudest form of that is removing the check. An implementation should record
+whether `verify.sh` was present and executable when the session began, and refuse
+a turn that ends with it deleted or disarmed. Deleting the file between sessions
+is the opt-out in section 2 and must keep working. Deleting it in the middle of
+the session that it was about to block is not an opt-out, and the difference
+between the two is only visible to an implementation that looked before.
 
 ## 5. Conformance levels
 
@@ -116,7 +143,9 @@ distinction matters more than the ambition behind the convention.
 
 **Level 1, the gate.** `verify.sh` exists, and something mechanically refuses to
 let a turn end while it fails. The reference implementation in `hooks/` enforces
-this in full, and it is where every repository should start.
+this in full, and it is where every repository should start. "Refuses" has a
+budget: it sends the turn back a bounded number of times and then yields with a
+warning, because the host will not let a hook block forever.
 
 **Level 2, the evidence.** The checks inside `verify.sh` cover the four kinds of
 evidence in section 3. No tool enforces this, including this one. The gate

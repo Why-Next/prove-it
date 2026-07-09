@@ -17,13 +17,16 @@ jobs:
     # macOS uses BSD cksum and BSD date; Linux uses GNU. The gate hashes tree
     # state with cksum and stamps the ledger with date, so both have to pass.
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: Install shellcheck
         run: |
@@ -45,29 +48,45 @@ jobs:
 
   # The gate has to fail when it should. A green verify.sh only proves the happy
   # path; this proves the unhappy one, in CI, on every commit.
+  #
+  # Every hook below runs with the sandbox as the working directory. The state
+  # the hooks write is keyed by repository, and an earlier version of this job
+  # ran the session hook in $GITHUB_WORKSPACE instead. The keys did not match,
+  # the gate saw a session that had touched nothing, and it exited 0. The job
+  # that existed to prove the gate blocks could not have passed.
   gate-blocks:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: A failing verify.sh must block the turn
         run: |
           set -eu
+          gate="$GITHUB_WORKSPACE/hooks/prove-it.sh"
+          session="$GITHUB_WORKSPACE/hooks/session-start.sh"
+
           sandbox=$(mktemp -d)
           git -C "$sandbox" init -q
           git -C "$sandbox" config user.email ci@example.com
           git -C "$sandbox" config user.name ci
           echo base > "$sandbox/file.txt"
-          git -C "$sandbox" add -A
-          git -C "$sandbox" commit -qm init
-          echo dirty >> "$sandbox/file.txt"
           printf '#!/bin/bash\nexit 1\n' > "$sandbox/verify.sh"
           chmod +x "$sandbox/verify.sh"
+          git -C "$sandbox" add -A
+          git -C "$sandbox" commit -qm init
 
-          printf '{"session_id":"ci"}' | bash hooks/mark-session-write.sh
+          # The session starts here, with the gate armed and nothing to prove.
+          ( cd "$sandbox" && printf '{"session_id":"ci"}' | bash "$session" )
+
+          # Now the session changes the repository.
+          echo dirty >> "$sandbox/file.txt"
+
           set +e
           ( cd "$sandbox" && printf '{"session_id":"ci","stop_hook_active":false,"transcript_path":""}' \
-              | bash "$GITHUB_WORKSPACE/hooks/prove-it.sh" >/dev/null 2>&1 )
+              | bash "$gate" >/dev/null 2>&1 )
           rc=$?
           set -e
 

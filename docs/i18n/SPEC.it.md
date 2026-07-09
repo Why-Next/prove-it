@@ -103,15 +103,44 @@ Un'implementazione di questa convenzione è un gate. Per essere conforme deve:
 1. Eseguire `verify.sh` dalla radice del repository prima che il turno
    dell'agente possa terminare.
 2. Bloccare il turno su un'uscita diversa da zero, e mostrare l'output.
-3. Non fare nulla quando `verify.sh` è assente o non eseguibile.
-4. Non fare nulla quando la sessione non ha apportato modifiche a quel repository.
+3. Non fare nulla quando `verify.sh` non esiste come eseguibile al momento in cui
+   il gate viene eseguito e non esisteva come eseguibile all'inizio della sessione.
+4. Non fare nulla quando la sessione non ha modificato quel repository.
 5. Fornire un bypass esplicito e ispezionabile con grep. Un bypass silenzioso
    insegna alle persone a diffidare del gate; uno tracciato lo mantiene onesto.
+6. Non terminare mai un turno in silenzio dopo una verifica fallita.
+   Un'implementazione che smette di bloccare, per qualsiasi motivo, deve dirlo
+   dove l'utente lo vedrà.
+
+Il punto 4 chiede cosa è cambiato, non chi lo ha cambiato. Un'implementazione che
+decide osservando quali strumenti di modifica l'agente ha chiamato mancherà un
+file riscritto da `sed`, una patch applicata con `git apply`, l'output di un
+generatore di codice e un commit. Committare è la cosa più ordinaria che un
+agente faccia, e un gate che tratta un albero di lavoro pulito come nulla da
+dimostrare lascerà passare proprio i turni che esiste per intercettare. Confronta
+il repository con com'era quando la sessione è iniziata.
+
+Il punto 3 usa deliberatamente entrambi i momenti. Lo stop corrente conta perché
+un comando di installazione possa creare `verify.sh` e armare il repository nella
+stessa sessione. Lo stato iniziale conta perché una cancellazione o un `chmod -x`
+a metà sessione sia trattato come disarmo del gate, non come opt-out onesto.
+
+Il punto 6 esiste perché un gate che può bloccare per sempre blocca la sessione,
+e ogni host prima o poi lo costringe a cedere. Questo va bene. Ciò che non va bene
+è cedere in un modo indistinguibile dal passare.
 
 Non deve modificare `verify.sh`, e deve dire all'agente che indebolire
 `verify.sh` per superare il gate è una violazione anziché una correzione. Questa
 è la modalità di fallimento più probabile nella pratica. Un agente che non riesce
 a superare un controllo, se ne ha l'occasione, modificherà il controllo.
+
+La forma più grossolana di ciò è rimuovere il controllo. Un'implementazione
+dovrebbe registrare se `verify.sh` era presente ed eseguibile quando la sessione
+è iniziata, e rifiutare un turno che finisce con il file cancellato o disarmato.
+Cancellare il file tra una sessione e l'altra è la rinuncia della sezione 2 e
+deve continuare a funzionare. Cancellarlo nel mezzo della sessione che stava per
+bloccare non è una rinuncia, e la differenza tra le due è visibile solo a
+un'implementazione che ha guardato prima.
 
 ## 5. Livelli di conformità
 
@@ -121,6 +150,8 @@ Questa distinzione conta più dell'ambizione dietro la convenzione.
 **Level 1, il gate.** `verify.sh` esiste, e qualcosa rifiuta meccanicamente di
 lasciar terminare un turno mentre fallisce. L'implementazione di riferimento in
 `hooks/` lo impone per intero, ed è da qui che ogni repository dovrebbe partire.
+"Rifiuta" ha un budget: rimanda il turno indietro un numero limitato di volte e
+poi cede con un avviso, perché l'host non lascerà che un hook blocchi per sempre.
 
 **Level 2, la prova.** I controlli dentro `verify.sh` coprono i quattro tipi di
 prova della sezione 3. Nessuno strumento lo impone, questo incluso. Il gate

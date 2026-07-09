@@ -80,8 +80,15 @@ case "$OUT" in
     *"Not a git repository"*) bad "the failure demo runs inside the repo" "no git error" "git error" ;;
     *) ok "the failure demo runs inside the repo" ;;
 esac
-[ -e "$D/.prove-it-demo.sh" ] && bad "the demo copy is cleaned up" "gone" "left behind" \
-                             || ok "the demo copy is cleaned up"
+LEFT=$(find "$D" -maxdepth 1 -name '.prove-it-demo.*' | grep -c . || true)
+expect "the demo copy is cleaned up" 0 "$LEFT"
+
+# The demo used to be a fixed name at the repo root, so a repository that
+# already had that file lost it: overwritten, then deleted.
+D=$(new_repo demo-collision package.json)
+printf 'mine\n' > "$D/.prove-it-demo.sh"
+( cd "$D" && bash "$CLI" init >/dev/null 2>&1 )
+expect "init leaves an existing .prove-it-demo.sh alone" "mine" "$(cat "$D/.prove-it-demo.sh")"
 
 # --- init never clobbers an existing gate ------------------------------------
 D=$(new_repo existing package.json)

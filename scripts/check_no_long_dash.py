@@ -21,7 +21,7 @@ BANNED = "—–―−‒‑"
 
 ROOTS = (
     "README.md", "SPEC.md", "CONTRIBUTING.md", "CHANGELOG.md",
-    "SECURITY.md", "CODE_OF_CONDUCT.md",
+    "SECURITY.md", "CODE_OF_CONDUCT.md", "RELEASE.md", "SUPPORT.md",
     "docs", "recipes", "hooks", "scripts", "tests", ".github", ".claude-plugin",
 )
 SUFFIXES = {".md", ".sh", ".py", ".json", ".yml", ".yaml", ".svg"}

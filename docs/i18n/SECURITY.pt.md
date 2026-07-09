@@ -11,19 +11,40 @@ já aceita quando roda `npm install` ou abre um projeto com um `Makefile`. Leia 
 `verify.sh` desconhecido antes de deixar um agente trabalhar no repositório que o
 contém, do mesmo jeito que você leria um script `postinstall` desconhecido.
 
-O portão só roda quando a sessão editou arquivos **naquele mesmo repositório**, a
-árvore de trabalho está suja, e existe um `verify.sh` executável na raiz do
-repositório. Clonar e ler um repositório nunca o dispara, e editar um repositório
-nunca faz o `verify.sh` de outro repositório rodar.
+O portão só roda quando a sessão mudou **aquele mesmo repositório** e existe um
+`verify.sh` executável na raiz dele. Clonar e ler um repositório nunca o dispara,
+e mudar um repositório nunca faz o `verify.sh` de outro repositório rodar.
+
+O `prove-it doctor` é a exceção, e é deliberada: você pediu que ele rodasse o
+portão, então ele roda o `verify.sh` imediatamente, em qualquer repositório em
+que você esteja. Não o rode dentro de um repositório cujo `verify.sh` você não
+leu.
+
+Nada disso é uma sandbox. Os hooks e a contabilidade deles rodam como você, e o
+shell do agente também, de modo que um agente decidido a derrotar o portão
+poderia apagar o diretório de estado e depois desarmar o `verify.sh`. O
+`prove-it` é uma proteção contra um agente que está errado com confiança, que é
+o que você tem. Não é uma fronteira contra um agente hostil. Uma verificação que
+um agente hostil não consegue alcançar tem de rodar em algum lugar que ele não
+consiga alcançar, e esse lugar é a CI.
 
 ## O que ele escreve no disco
 
-Dois marcadores, ambos em um diretório privado criado com o modo `0700`:
-`$XDG_STATE_HOME/prove-it/`, ou `~/.local/state/prove-it/` quando isso não está
-definido. Sobrescreva com `PROVE_IT_STATE_DIR`. Nada é escrito no `/tmp`
-compartilhado, porque esses nomes de arquivo são derivados do caminho do
+Pequenos arquivos de contabilidade, todos em um diretório privado criado com o
+modo `0700`: `$XDG_STATE_HOME/prove-it/`, ou `~/.local/state/prove-it/` quando
+isso não está definido. Sobrescreva com `PROVE_IT_STATE_DIR`. Eles registram como
+a árvore estava quando uma sessão começou, se o portão estava armado naquele
+momento, para quais repositórios uma sessão escreveu, quais estados da árvore já
+passaram, e quantas vezes o turno atual foi mandado de volta. Cada um guarda um
+checksum ou um pequeno inteiro, nunca conteúdo de arquivo. Nada é escrito no
+`/tmp` compartilhado, porque esses nomes de arquivo são derivados do caminho do
 repositório e portanto previsíveis, e um nome previsível em um diretório gravável
 por todos é um alvo de symlink.
+
+O identificador da sessão chega no payload JSON do hook e acaba dentro de um
+desses nomes de arquivo, então é reduzido a letras, dígitos, hífen e sublinhado
+antes de ser usado. Um payload não é uma fonte confiável de componentes de
+caminho.
 
 O registro opcional (`PROVE_IT_LEDGER=1`, **desligado por padrão**) acrescenta
 uma linha JSON por conclusão falsa flagrada a `~/.prove-it/ledger.jsonl`, criado
@@ -33,7 +54,8 @@ com o modo `0600` dentro de um diretório `0700`. Cada linha guarda:
   caracteres e extraída do seu transcript local, então pode conter qualquer coisa
   que estava na sua conversa
 - o caminho absoluto do repositório
-- o código de saída e as últimas cinco linhas da saída do seu `verify.sh`
+- o código de saída, e as linhas da saída do seu `verify.sh` que nomeiam uma
+  falha
 - um timestamp
 
 Trate-o como dados de conversa. Nada neste projeto o lê de volta ou o envia para

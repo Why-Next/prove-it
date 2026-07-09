@@ -73,3 +73,10 @@ entrega cada comprobación.
 
 Commits convencionales (`feat:`, `fix:`, `docs:`, `chore:`). Di en el cuerpo qué cambió y por
 qué. Si corregiste un error, di cómo lo reprodujiste.
+
+## Releases
+
+Los maintainers siguen [RELEASE.md](../../RELEASE.md). Una release necesita un
+`./verify.sh` local limpio, workflows `verify`, `codeql` y `scorecard` en verde
+en `main`, y el checksum más la attestation de procedencia del workflow de tag.
+No publiques desde un árbol no verificado.

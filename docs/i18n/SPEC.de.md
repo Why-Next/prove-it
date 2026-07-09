@@ -103,17 +103,48 @@ sie:
 1. `verify.sh` vom Wurzelverzeichnis des Repositorys aus ausführen, bevor der
    Zug des Agenten enden kann.
 2. Den Zug bei einem Exit-Code ungleich null blockieren und die Ausgabe zeigen.
-3. Nichts tun, wenn `verify.sh` fehlt oder nicht ausführbar ist.
-4. Nichts tun, wenn die Sitzung keine Änderungen an diesem Repository vorgenommen
-   hat.
+3. Nichts tun, wenn `verify.sh` weder beim Lauf des Gates ausführbar vorhanden
+   ist noch zu Beginn der Sitzung ausführbar vorhanden war.
+4. Nichts tun, wenn die Sitzung dieses Repository nicht verändert hat.
 5. Einen expliziten, grepbaren Bypass bereitstellen. Ein stiller Bypass bringt
    Menschen dazu, dem Gate zu misstrauen; ein auditierter hält es ehrlich.
+6. Einen Zug niemals still nach einer fehlgeschlagenen Verifikation beenden. Eine
+   Implementierung, die aus welchem Grund auch immer aufhört zu blockieren, muss
+   das dort sagen, wo der Nutzer es sieht.
+
+Punkt 4 fragt, was sich geändert hat, nicht wer es geändert hat. Eine
+Implementierung, die anhand dessen entscheidet, welche Bearbeitungswerkzeuge der
+Agent aufgerufen hat, verpasst eine von `sed` neu geschriebene Datei, einen mit
+`git apply` angewandten Patch, die Ausgabe eines Code-Generators und einen
+Commit. Committen ist das Gewöhnlichste, was ein Agent tut, und ein Gate, das
+einen sauberen Arbeitsbaum als nichts zu Beweisendes behandelt, winkt genau die
+Züge durch, die es fangen soll. Vergleiche das Repository damit, wie es aussah,
+als die Sitzung begann.
+
+Punkt 3 verwendet beide Zeitpunkte absichtlich. Der aktuelle Stopp zählt, damit
+ein Installationsbefehl `verify.sh` erstellen und das Repository in derselben
+Sitzung scharf schalten kann. Der Anfangszustand zählt, damit eine Löschung oder
+ein `chmod -x` mitten in der Sitzung als Entwaffnen des Gates behandelt wird und
+nicht als ehrlicher Ausstieg.
+
+Punkt 6 gibt es, weil ein Gate, das ewig blockieren kann, die Sitzung hängen
+lässt, und jeder Host es irgendwann zum Nachgeben zwingt. Das ist in Ordnung.
+Nicht in Ordnung ist es, auf eine Weise nachzugeben, die von Bestehen nicht zu
+unterscheiden ist.
 
 Sie darf `verify.sh` nicht verändern, und sie muss dem Agenten sagen, dass das
 Abschwächen von `verify.sh`, um am Gate vorbeizukommen, eine Verletzung ist und
 keine Behebung. Das ist in der Praxis der wahrscheinlichste Fehlermodus. Ein
 Agent, der einen Check nicht bestehen kann, wird, wenn er die Gelegenheit hat,
 den Check bearbeiten.
+
+Die roheste Form davon ist, den Check zu entfernen. Eine Implementierung sollte
+festhalten, ob `verify.sh` beim Beginn der Sitzung vorhanden und ausführbar war,
+und einen Zug verweigern, der mit gelöschtem oder entwaffnetem `verify.sh` endet.
+Die Datei zwischen Sitzungen zu löschen ist der Ausstieg aus Abschnitt 2 und muss
+weiter funktionieren. Sie mitten in der Sitzung zu löschen, die sie gerade
+blockieren wollte, ist kein Ausstieg, und der Unterschied zwischen beidem ist nur
+für eine Implementierung sichtbar, die vorher hingeschaut hat.
 
 ## 5. Konformitätsstufen
 
@@ -123,6 +154,9 @@ Diese Unterscheidung zählt mehr als der Ehrgeiz hinter der Konvention.
 **Level 1, das Gate.** `verify.sh` existiert, und etwas verweigert mechanisch,
 einen Zug enden zu lassen, solange es fehlschlägt. Die Referenzimplementierung
 in `hooks/` erzwingt das vollständig, und dort sollte jedes Repository anfangen.
+"Verweigert" hat ein Budget: Es schickt den Zug eine begrenzte Anzahl von Malen
+zurück und gibt dann mit einer Warnung nach, weil der Host einen Hook nicht ewig
+blockieren lässt.
 
 **Level 2, die Beweise.** Die Checks in `verify.sh` decken die vier Arten von
 Beweisen aus Abschnitt 3 ab. Kein Werkzeug erzwingt das, dieses eingeschlossen.

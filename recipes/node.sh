@@ -15,9 +15,14 @@ npm run lint --if-present
 # Diff hygiene: no conflict markers, no whitespace damage.
 git diff --check
 
-# Reproduction and debug leftovers are the two things linters miss.
-if git diff HEAD | grep -nE '^\+.*(console\.log|debugger|\.only\()' ; then
-    echo "verify.sh: debug statement or focused test left in the diff" >&2
+# Debug leftovers are the thing linters miss. A focused test is the worst of
+# them: the suite goes green because it stopped running.
+#
+# console.log is deliberately absent. In anything with a command line interface
+# it is ordinary output, and a check that fails on ordinary output is a check
+# people learn to bypass. Add it here only if your project never prints.
+if git diff HEAD | grep -nE '^\+.*(\bdebugger\b|\.only\()' ; then
+    echo "verify.sh: debugger or focused test left in the diff" >&2
     exit 1
 fi
 

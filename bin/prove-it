@@ -95,15 +95,19 @@ cmd_init() {
     # The copy has to live inside the repository. verify.sh starts with
     # `cd "$(dirname "$0")"`, so a copy under /tmp would cd to /tmp and fail
     # because it is not a git repository, which demonstrates the wrong thing.
+    #
+    # mktemp, not a fixed name: a fixed name in someone else's repository is a
+    # file of theirs that this command overwrites and then deletes.
     say "now proving it can fail. Running a copy with 'exit 1' appended:"
     say ""
-    local demo="$root/.prove-it-demo.sh"
+    local demo
+    demo=$(mktemp "$root/.prove-it-demo.XXXXXX") || die "cannot write to $root"
     trap 'rm -f "$demo"' EXIT INT TERM
     cat "$verify" > "$demo"
     echo 'exit 1' >> "$demo"
     chmod +x "$demo"
     local rc=0
-    ( cd "$root" && bash ./.prove-it-demo.sh ) || rc=$?
+    ( cd "$root" && bash "./$(basename "$demo")" ) || rc=$?
     rm -f "$demo"
     trap - EXIT INT TERM
     say "  -> exit $rc  (this is what blocks a turn)"
@@ -137,11 +141,17 @@ cmd_doctor() {
         say "verify.sh    present and executable"
     fi
 
+    # The gate compares the tree against what it looked like when the session
+    # started, so a clean tree is not the same as nothing to prove: a session
+    # that committed its work changed the tree too.
     if [ -n "$(git -C "$root" status --porcelain 2>/dev/null | head -1)" ]; then
-        say "working tree dirty, so the gate would run on the next stop"
+        say "working tree dirty"
     else
-        say "working tree clean, so the gate is skipped until you change something"
+        say "working tree clean, though a commit made this session still counts"
     fi
+
+    local max=${PROVE_IT_MAX_BLOCKS:-3}
+    say "blocks       up to $max per turn, then it yields with a warning"
 
     local state="${PROVE_IT_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/prove-it}"
     say "state        $state"

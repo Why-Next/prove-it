@@ -45,3 +45,10 @@
 ## 커밋
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). 본문에 무엇이 왜 바뀌었는지 적으세요. 버그를 고쳤다면, 어떻게 재현했는지 적으세요.
+
+## 릴리스
+
+메인테이너는 [RELEASE.md](../../RELEASE.md)를 따릅니다. 릴리스에는 깨끗한 로컬
+`./verify.sh`, `main`의 green `verify`, `codeql`, `scorecard` workflow, 그리고
+태그 workflow의 checksum과 provenance attestation이 필요합니다. 검증되지 않은
+트리에서 배포하지 마세요.

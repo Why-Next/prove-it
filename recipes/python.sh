@@ -14,8 +14,11 @@ python -m ruff check .
 
 git diff --check
 
-if git diff HEAD | grep -nE '^\+.*(breakpoint\(\)|import pdb|print\()' ; then
-    echo "verify.sh: debugger or stray print left in the diff" >&2
+# Debuggers only. `print(` was here once and it failed every change that added
+# a line of legitimate CLI output, which is how a check teaches people to
+# bypass the gate. A check that cries wolf is worse than no check.
+if git diff HEAD | grep -nE '^\+.*(breakpoint\(\)|import pdb|pdb\.set_trace\(\))' ; then
+    echo "verify.sh: debugger left in the diff" >&2
     exit 1
 fi
 

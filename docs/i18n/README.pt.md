@@ -26,14 +26,34 @@ propriedade do design, não um defeito de caráter, e nenhum prompt conserta.
 
 O `prove-it` transforma o relato em uma verificação. Coloque um `verify.sh` na
 raiz do seu repositório. Quando o agente tenta encerrar o turno, um hook roda o
-script, e uma saída diferente de zero mantém o turno aberto até que a causa seja
-corrigida.
+script, e uma saída diferente de zero manda o agente de volta ao trabalho em vez
+de deixá-lo parar.
 
 ![prove-it bloqueia um agente que afirma estar pronto](../../docs/demo.svg)
 
-No meu próprio uso, um pouco menos da metade dos turnos que batem em um portão
-que falha voltam com o agente admitindo que não tinha terminado. Esses turnos, de
-outra forma, teriam terminado com a palavra "pronto".
+O portão empurra de volta até três vezes por turno e então cede, porque um hook
+que nunca cede trava a sessão. Ceder não é o mesmo que passar, então a última
+coisa que você vê é um aviso de que o turno terminou sem verificação, e não a
+palavra "pronto". Três é um número que você pode mudar, e nada disso é uma
+afirmação de que o seu agente não consegue passar pelo portão. É uma afirmação de
+que ele não consegue passar pelo portão em silêncio.
+
+Use quando um repositório tem um comando local que precisa ser verdadeiro antes
+de um agente devolver o trabalho: testes, checagem de tipos, lint, verificações
+de arquivos gerados, dry runs de migração ou um pequeno smoke test que prova que
+o bug sumiu. `prove-it` é mais útil em repositórios onde um agente edita código e
+diz "pronto" na mesma conversa.
+
+Não use como sandbox, substituto de CI, nem lugar para jobs longos com rede. Se
+uma verificação precisa de secrets, acesso de produção ou mais de cerca de um
+minuto, coloque essa verificação no CI e mantenha o `verify.sh` como a prova
+local que o agente consegue rodar enquanto ainda está trabalhando.
+
+O fluxo do primeiro dia é pequeno de propósito. Instale o plugin, rode
+`/prove-it:init`, mantenha o `git diff --check` gerado como a única verificação
+ativa, e então ligue um comando real depois de vê-lo passar manualmente. A partir
+daí, quando o agente muda o repositório e tenta parar, o `verify.sh` decide se
+ele pode devolver o trabalho.
 
 ## Instalação
 
@@ -81,7 +101,8 @@ está, e diz o que o está impedindo caso não dispare:
 ```
 repository   /home/you/src/api
 verify.sh    present and executable
-working tree dirty, so the gate would run on the next stop
+working tree dirty
+blocks       up to 3 per turn, then it yields with a warning
 state        /home/you/.local/state/prove-it
 ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
@@ -106,27 +127,46 @@ nenhum portão, porque relata que uma verificação rodou quando nada rodou.
 
 O portão fica quieto a menos que todas estas condições valham:
 
-- esta sessão editou arquivos neste repositório
+- esta sessão mudou este repositório
 - existe um `verify.sh` executável na raiz do repositório
-- a árvore de trabalho tem mudanças não commitadas
 - este exato estado da árvore ainda não passou
+
+"Mudou" é respondido pelo repositório, não por um registro de quais ferramentas
+rodaram. No início de uma sessão o hook registra como a árvore estava, e a cada
+parada ele pergunta se a árvore ainda está assim. Um arquivo reescrito pelo
+`sed`, um patch aplicado com `git apply`, um arquivo emitido por um gerador de
+código, e um commit são todos mudanças, porque todos eles mudam a árvore. Uma
+sessão que só leu não conta como nada, mesmo em um repositório que já estava sujo
+quando ela abriu.
 
 A última condição significa que uma árvore que passa é verificada uma vez em vez
 de a cada parada. Quando a verificação falha, o agente vê as últimas vinte linhas
 da saída, o que costuma bastar para ele corrigir a causa sem que lhe digam o que
 deu errado.
 
-`PROVE_IT_SKIP=1` passa pelo portão de propósito. Apagar o `verify.sh` o desliga
-de vez. Ambas as saídas de emergência são deliberadas: as pessoas contornam um
-portão que não conseguem remover.
+`PROVE_IT_SKIP=1` passa pelo portão de propósito. Apagar o `verify.sh` entre
+sessões o desliga de vez. Ambas as saídas de emergência são deliberadas: as
+pessoas contornam um portão que não conseguem remover. `PROVE_IT_MAX_BLOCKS`
+define quantas vezes um turno pode ser mandado de volta, e `0` faz o portão
+relatar sem nunca bloquear.
 
 ## Quando o agente edita o portão
 
 O modo de falha mais difícil não é uma verificação instável. É um agente que não
-consegue fazer o `verify.sh` passar e edita o `verify.sh` em vez disso. A
-mensagem de falha diz para não fazer isso, e o [SPEC.md](../../SPEC.md) chama
-isso de violação, não de correção, mas nenhuma das duas coisas é imposição. Leia
-os seus diffs. É para isso que serve a evidência de diff na spec.
+consegue fazer o `verify.sh` passar e edita o `verify.sh` em vez disso.
+
+A versão mais barata disso é desarmar o portão de vez, então o portão a recusa. O
+hook registra se o `verify.sh` era executável quando a sessão começou, e uma
+sessão que termina com ele apagado ou com o seu bit de execução removido é
+bloqueada, informada do que fez, e informada de como optar por sair honestamente
+se era isso que ela queria. Apagar o `verify.sh` entre sessões ainda é uma saída
+e ainda leva um comando.
+
+O que continua sem imposição é a versão sutil: um agente que mantém o `verify.sh`
+executável e silenciosamente esvazia as verificações dentro dele. A mensagem de
+falha diz para não fazer isso, e o [SPEC.md](../../SPEC.md) chama isso de
+violação, não de correção, mas nenhuma das duas coisas é imposição. Leia os seus
+diffs. É para isso que serve a evidência de diff na spec.
 
 ## A convenção do `verify.sh`
 
@@ -151,6 +191,15 @@ neste portão e não prova nada.
 A spec chama isso de Level 1. O Level 2 é se as suas verificações afirmam contra
 evidência real, e nenhuma ferramenta consegue verificar isso por você, incluindo
 esta.
+
+Mais três fronteiras, ditas claramente porque de outra forma você as encontrará
+em um mau momento. O portão cede depois de `PROVE_IT_MAX_BLOCKS` recusas, então
+um agente determinado chega ao fim do seu turno; o que ele não consegue fazer é
+chegar lá em silêncio. Os arquivos que o seu `.gitignore` exclui são invisíveis
+para a detecção de mudanças, então um `verify.sh` que lê um `.env` ignorado pode
+ser pulado quando só esse arquivo mudou. E uma sessão que começa fora do
+repositório que ela depois edita não tem baseline para comparar, o que rebaixa o
+portão ao teste mais fraco de se a árvore de trabalho está suja.
 
 ## Receitas
 
@@ -190,14 +239,28 @@ em vez disso. O `/prove-it:ledger` resume o arquivo para você, assim como
 O `prove-it` tem um `verify.sh`, e parte do que ele roda é o próprio portão,
 contra repositórios git reais em um diretório temporário: uma verificação que
 falha bloqueia, uma verificação que passa permite, uma sessão somente leitura
-fica intocada, uma árvore limpa é pulada, o bypass funciona.
+fica intocada, uma árvore limpa depois de um commit não é confundida com ausência
+de trabalho, o bypass funciona.
 
 ```bash
 ./verify.sh
 ```
 
 O CI roda esse mesmo script no Linux e no macOS, além de um job separado que
-prova que o portão ainda bloqueia um repositório cujas verificações falham.
+prova que o portão ainda bloqueia um repositório cujas verificações falham. O
+repositório também roda CodeQL, OpenSSF Scorecard e um workflow de release por
+tag que empacota o código-fonte com checksum e attestation de proveniência do
+GitHub.
+
+## Confiança no projeto
+
+Leia [SECURITY.md](../../SECURITY.md) antes de usar isto em repositórios nos
+quais você não confia. `prove-it` executa o `verify.sh` pertencente ao
+repositório; é uma guardrail, não uma sandbox.
+
+Os passos de release ficam em [RELEASE.md](../../RELEASE.md), incluindo a
+checklist de verificação, status dos workflows, checksums e attestation de
+proveniência. Os limites de suporte ficam em [SUPPORT.md](../../SUPPORT.md).
 
 ## Contribuindo
 

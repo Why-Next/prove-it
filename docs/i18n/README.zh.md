@@ -21,11 +21,17 @@
 
 编程智能体会在从未运行测试的情况下报告测试通过，会在从未复现 bug 的情况下报告 bug 已修复。智能体没有办法把自己做过的事和自己想做的事对照起来，于是它报告的是意图。这是一种设计属性，不是品格缺陷，没有任何提示词能修好它。
 
-`prove-it` 把这份报告变成一次检查。在你的仓库根目录放一个 `verify.sh`。当智能体试图结束这一回合时，一个 hook 会运行这个脚本，只要退出码非零，这一回合就会一直开着，直到原因被修好。
+`prove-it` 把这份报告变成一次检查。在你的仓库根目录放一个 `verify.sh`。当智能体试图结束这一回合时，一个 hook 会运行这个脚本，只要退出码非零，就会把智能体送回去继续干活，而不是让它停下。
 
 ![prove-it 拦下一个声称自己已完成的智能体](../../docs/demo.svg)
 
-在我自己的使用中，撞上失败门禁的回合里，有将近一半会以智能体承认自己还没做完收场。这些回合本来会以一句"完成了"结束。
+门禁在一个回合里最多把智能体顶回去三次，然后让步，因为一个永不让步的 hook 会把会话挂死。让步和通过不是一回事，所以你最后看到的是一句警告，说这一回合在未经验证的情况下结束了，而不是那句"完成了"。三这个数字你可以改，而这一切都不是在说你的智能体过不了门禁。它说的是，你的智能体没法悄无声息地越过门禁。
+
+当仓库里有一个本地命令必须在智能体交回工作前为真时，就使用它：测试、类型检查、lint、生成文件检查、迁移 dry run，或证明 bug 已经消失的小型 smoke test。`prove-it` 最适合那些智能体会改代码，并在同一个线程里说"完成了"的仓库。
+
+不要把它当作 sandbox、CI 替代品，或长时间联网任务的地方。如果某项检查需要 secrets、production access，或大约一分钟以上，就把它放进 CI，并让 `verify.sh` 只保留智能体仍在工作时能本地运行的证据。
+
+第一天的流程刻意很小。安装插件，运行 `/prove-it:init`，只保留生成的 `git diff --check` 作为激活的检查，然后在你亲手看见某个真实命令通过之后再打开它。从那以后，当智能体改动仓库并试图停下时，`verify.sh` 决定它是否可以交回工作。
 
 ## 安装
 
@@ -59,7 +65,8 @@ git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
 ```
 repository   /home/you/src/api
 verify.sh    present and executable
-working tree dirty, so the gate would run on the next stop
+working tree dirty
+blocks       up to 3 per turn, then it yields with a warning
 state        /home/you/.local/state/prove-it
 ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
@@ -76,18 +83,23 @@ ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 
 除非下面每一条都成立，否则门禁保持安静：
 
-- 本次会话编辑过这个仓库里的文件
+- 本次会话改动过这个仓库
 - 仓库根目录存在一个可执行的 `verify.sh`
-- 工作树有未提交的改动
 - 这个确切的树状态还没有通过过
+
+"改动过"是由仓库来回答的，而不是由一份记录着哪些工具运行过的日志来回答。会话一开始，hook 会记录下当时的树是什么样子，而在每次停止时，它会问树现在是不是还那样。一个被 `sed` 重写的文件、一个用 `git apply` 打上去的补丁、一个由代码生成器产出的文件，以及一次提交，全都是改动，因为它们全都改变了树。一次只做了读取的会话，什么都不算，哪怕它打开时仓库本来就是脏的。
 
 最后一条意味着：一个通过的树只验证一次，而不是每次停止都验证。验证失败时，智能体会看到输出的最后二十行，这通常足以让它在没人告诉它哪里出错的情况下修好原因。
 
-`PROVE_IT_SKIP=1` 会有意越过门禁。删除 `verify.sh` 会把它彻底关掉。这两个逃生口都是刻意保留的：人们会绕开一个自己无法移除的门禁。
+`PROVE_IT_SKIP=1` 会有意越过门禁。在两次会话之间删除 `verify.sh` 会把它彻底关掉。这两个逃生口都是刻意保留的：人们会绕开一个自己无法移除的门禁。`PROVE_IT_MAX_BLOCKS` 设定一个回合能被顶回去多少次，而 `0` 会让门禁只报告、永不拦截。
 
 ## 当智能体去改门禁本身
 
-最棘手的失败模式不是不稳定的检查。而是一个无法让 `verify.sh` 通过的智能体，转而去改 `verify.sh`。失败信息会告诉它不要这么做，[SPEC.md](../../SPEC.md) 也把这称为一种违规而不是修复，但这两者都不是强制手段。读你的 diff。这正是规范里那条 diff 证据存在的意义。
+最棘手的失败模式不是不稳定的检查。而是一个无法让 `verify.sh` 通过的智能体，转而去改 `verify.sh`。
+
+其中最省事的一种做法，是干脆把门禁卸掉，所以门禁会拒绝这么做。hook 会记录会话开始时 `verify.sh` 是不是可执行的，而一次以它被删除、或它的可执行位被去掉而收场的会话，会被拦下，被告知它做了什么，也被告知如果它当真想退出该怎样诚实地退出。在两次会话之间删除 `verify.sh` 仍然是一种退出方式，而且仍然只需要一条命令。
+
+留下没被强制的是更隐蔽的那一种：一个让 `verify.sh` 保持可执行、却悄悄把里面的检查掏空的智能体。失败信息会告诉它不要这么做，[SPEC.md](../../SPEC.md) 也把这称为一种违规而不是修复，但这两者都不是强制手段。读你的 diff。这正是规范里那条 diff 证据存在的意义。
 
 ## `verify.sh` 约定
 
@@ -100,6 +112,8 @@ ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 门禁只强制一件事：`verify.sh` 在回合结束前返回了零。那个零有没有意义，完全取决于你写的检查。一个只包含 `exit 0` 的 `verify.sh` 会通过这道门禁，却什么都证明不了。
 
 规范把那称为 Level 1。Level 2 是你的检查是否据以真实证据来断言，而没有任何工具能替你验证这一点，包括这一个。
+
+还有三条边界，这里直白地讲出来，否则你会在一个糟糕的时刻才撞见它们。门禁在 `PROVE_IT_MAX_BLOCKS` 次拒绝之后就会让步，所以一个执意如此的智能体终究能走到它这一回合的尽头；它做不到的，是悄无声息地走到那里。被你的 `.gitignore` 排除掉的文件，对改动检测是不可见的，所以当只有一个被忽略的 `.env` 发生变化时，一个会去读它的 `verify.sh` 可能会被跳过。还有，一次在它后来所编辑的仓库之外开始的会话，没有基线可供比对，这会让门禁退回到那个更弱的判据：工作树是不是脏的。
 
 ## 配方
 
@@ -127,13 +141,19 @@ ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 
 ## 这个仓库对自己设卡
 
-`prove-it` 有一个 `verify.sh`，它运行的一部分内容就是门禁本身，在一个临时目录里针对真实的 git 仓库运行：失败的检查会拦截，通过的检查会放行，只读会话不受打扰，干净的树会被跳过，绕过机制有效。
+`prove-it` 有一个 `verify.sh`，它运行的一部分内容就是门禁本身，在一个临时目录里针对真实的 git 仓库运行：失败的检查会拦截，通过的检查会放行，只读会话不受打扰，提交后的干净树不会被误认为没有工作，绕过机制有效。
 
 ```bash
 ./verify.sh
 ```
 
-CI 会在 Linux 和 macOS 上运行同一个脚本，另外还有一个单独的任务，用来证明门禁仍然会拦下一个检查失败的仓库。
+CI 会在 Linux 和 macOS 上运行同一个脚本，另外还有一个单独的任务，用来证明门禁仍然会拦下一个检查失败的仓库。这个仓库还会运行 CodeQL、OpenSSF Scorecard，以及一个按 tag 触发的 release workflow，用 checksum 和 GitHub provenance attestation 打包源码。
+
+## 项目信任
+
+在你不信任的仓库里使用它之前，请先阅读 [SECURITY.md](../../SECURITY.md)。`prove-it` 会执行仓库自己拥有的 `verify.sh`；它是 guardrail，不是 sandbox。
+
+Release 步骤在 [RELEASE.md](../../RELEASE.md)，其中包括 verification、workflow 状态、checksum 和 provenance attestation 的 checklist。支持边界在 [SUPPORT.md](../../SUPPORT.md)。
 
 ## 贡献
 

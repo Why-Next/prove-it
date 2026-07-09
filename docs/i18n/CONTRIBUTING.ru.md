@@ -77,3 +77,10 @@ macOS, плюс отдельная задача доказывает, что ш�
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). В теле опишите, что
 изменилось и почему. Если вы исправили ошибку, опишите, как её воспроизвели.
+
+## Релизы
+
+Мейнтейнеры следуют [RELEASE.md](../../RELEASE.md). Для релиза нужны чистый
+локальный `./verify.sh`, зелёные workflow `verify`, `codeql` и `scorecard` на
+`main`, а также checksum и provenance attestation из workflow тега. Не публикуйте
+из непроверенного дерева.

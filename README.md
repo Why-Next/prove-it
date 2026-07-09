@@ -26,13 +26,33 @@ property, not a character flaw, and no prompt fixes it.
 
 `prove-it` turns the report into a check. Put a `verify.sh` at your repository
 root. When the agent tries to end its turn, a hook runs the script, and a
-non-zero exit keeps the turn open until the cause is fixed.
+non-zero exit sends the agent back to work instead of letting it stop.
 
 ![prove-it blocks an agent that claims it is done](docs/demo.svg)
 
-In my own use, a little under half of the turns that hit a failing gate come back
-with the agent conceding it was not finished. Those turns would otherwise have
-ended with the word "done."
+The gate pushes back up to three times per turn and then yields, because a hook
+that never yields hangs the session. Yielding is not the same as passing, so the
+last thing you see is a warning that the turn ended unverified rather than the
+word "done." Three is a number you can change, and none of this is a claim that
+your agent cannot get past the gate. It is a claim that it cannot get past the
+gate quietly.
+
+Use it when a repository has a local command that must be true before an agent
+hands work back: tests, type checks, lint, generated-file checks, migration dry
+runs, or the small smoke test that proves the bug is gone. `prove-it` is most
+useful in repositories where an agent edits code and then says "done" in the
+same thread.
+
+Do not use it as a sandbox, a CI replacement, or a place for long networked
+jobs. If a check needs secrets, production access, or more than about a minute,
+put that check in CI and keep `verify.sh` to the local proof the agent can run
+while it is still working.
+
+The first-day flow is deliberately small. Install the plugin, run
+`/prove-it:init`, keep the generated `git diff --check` as the only active check,
+then turn on one real command after you have watched it pass by hand. From then
+on, when the agent changes the repository and tries to stop, `verify.sh` decides
+whether it may hand the work back.
 
 ## Install
 
@@ -79,7 +99,8 @@ standing in, and tells you what is stopping it if it would not:
 ```
 repository   /home/you/src/api
 verify.sh    present and executable
-working tree dirty, so the gate would run on the next stop
+working tree dirty
+blocks       up to 3 per turn, then it yields with a warning
 state        /home/you/.local/state/prove-it
 ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
@@ -103,27 +124,44 @@ than no gate, because it reports that a check ran when nothing did.
 
 The gate stays quiet unless all of these hold:
 
-- this session edited files in this repository
+- this session changed this repository
 - an executable `verify.sh` exists at the repository root
-- the working tree has uncommitted changes
 - this exact tree state has not already passed
+
+"Changed" is answered by the repository, not by a log of which tools ran. At the
+start of a session the hook records what the tree looked like, and at every stop
+it asks whether the tree still looks that way. A file rewritten by `sed`, a patch
+applied with `git apply`, a file emitted by a code generator, and a commit are
+all changes, because all of them change the tree. A session that only read
+counts as nothing, even in a repository that was already dirty when it opened.
 
 The last condition means a passing tree is verified once rather than on every
 stop. When verification fails, the agent sees the last twenty lines of output,
 which is usually enough for it to fix the cause without being told what went
 wrong.
 
-`PROVE_IT_SKIP=1` gets past the gate on purpose. Deleting `verify.sh` turns it
-off for good. Both escape hatches are deliberate: people route around a gate they
-cannot remove.
+`PROVE_IT_SKIP=1` gets past the gate on purpose. Deleting `verify.sh` between
+sessions turns it off for good. Both escape hatches are deliberate: people route
+around a gate they cannot remove. `PROVE_IT_MAX_BLOCKS` sets how many times one
+turn can be sent back, and `0` makes the gate report without ever blocking.
 
 ## When the agent edits the gate
 
 The hardest failure mode is not a flaky check. It is an agent that cannot make
-`verify.sh` pass and edits `verify.sh` instead. The failure message tells it not
-to, and [SPEC.md](SPEC.md) calls that a violation rather than a fix, but neither
-of those is enforcement. Read your diffs. That is what the diff evidence in the
-spec is for.
+`verify.sh` pass and edits `verify.sh` instead.
+
+The cheapest version of that is disarming the gate outright, so the gate refuses
+it. The hook records whether `verify.sh` was executable when the session began,
+and a session that ends with it deleted or with its executable bit removed is
+blocked, told what it did, and told how to opt out honestly if that is what it
+meant. Deleting `verify.sh` between sessions is still an opt-out and still takes
+one command.
+
+What remains unenforced is the subtle version: an agent that keeps `verify.sh`
+executable and quietly guts the checks inside it. The failure message tells it
+not to, and [SPEC.md](SPEC.md) calls that a violation rather than a fix, but
+neither of those is enforcement. Read your diffs. That is what the diff evidence
+in the spec is for.
 
 ## The `verify.sh` convention
 
@@ -145,6 +183,15 @@ A `verify.sh` containing only `exit 0` passes this gate and proves nothing.
 
 The spec calls that Level 1. Level 2 is whether your checks assert against real
 evidence, and no tool can verify that for you, this one included.
+
+Three more boundaries, stated plainly because you will otherwise find them at a
+bad moment. The gate yields after `PROVE_IT_MAX_BLOCKS` refusals, so a determined
+agent reaches the end of its turn; what it cannot do is arrive there silently.
+Files your `.gitignore` excludes are invisible to the change detection, so a
+`verify.sh` that reads an ignored `.env` may be skipped when only that file
+changed. And a session that begins outside the repository it later edits has no
+baseline to compare against, which drops the gate back to the weaker test of
+whether the working tree is dirty.
 
 ## Recipes
 
@@ -184,14 +231,26 @@ command line.
 `prove-it` has a `verify.sh`, and part of what it runs is the gate itself,
 against real git repositories in a temporary directory: a failing check blocks,
 a passing check allows, a read-only session is left alone, a clean tree is
-skipped, the bypass works.
+not mistaken for no work after a commit, the bypass works.
 
 ```bash
 ./verify.sh
 ```
 
 CI runs that same script on Linux and macOS, plus a separate job that proves the
-gate still blocks a repository whose checks fail.
+gate still blocks a repository whose checks fail. The repository also runs
+CodeQL, OpenSSF Scorecard, and a tag release workflow that packages source with
+a checksum and GitHub provenance attestation.
+
+## Project trust
+
+Read [SECURITY.md](SECURITY.md) before using this in repositories you do not
+trust. `prove-it` executes the repository-owned `verify.sh`; it is a guardrail,
+not a sandbox.
+
+Release steps live in [RELEASE.md](RELEASE.md), including the checklist for
+verification, workflow status, checksums, and provenance attestation. Support
+boundaries live in [SUPPORT.md](SUPPORT.md).
 
 ## Contributing
 

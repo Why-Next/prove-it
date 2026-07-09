@@ -8,6 +8,73 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0]
+
+The gate did not gate. An independent review, cross-checked against a second
+model, found five ways an agent reached the end of a turn without verification
+and one way the project's own CI could not have proved otherwise. Every one of
+them now has a test that fails when the fix is removed.
+
+### Fixed
+
+- **The gate blocked exactly once per turn.** Claude Code sets `stop_hook_active`
+  on every stop after the first block, and the hook read that flag as permission
+  to let the turn end. An agent that fixed nothing and simply stopped again was
+  waved through. The turn is now sent back up to `PROVE_IT_MAX_BLOCKS` times
+  (default 3), and when the budget is spent the gate yields with a warning the
+  user cannot miss rather than in silence.
+- **Committing bypassed the gate.** Verification was skipped whenever the working
+  tree was clean, so an agent that committed its work before stopping was never
+  checked. Committing is the most ordinary thing an agent does.
+- **Editing without the Edit tool bypassed the gate.** The hook only knew a
+  session had changed a repository if a `PostToolUse` marker fired for `Edit`,
+  `Write`, or `NotebookEdit`. A file rewritten with `sed`, a patch applied with
+  `git apply`, or anything a code generator emitted left no marker, and the
+  repository looked read-only. Change is now measured by comparing the working
+  tree against a baseline recorded at session start, so it does not matter which
+  tool did the writing.
+- **`chmod -x verify.sh` was a silent bypass.** Disarming the gate inside the
+  session it was about to block is now refused and explained. Deleting
+  `verify.sh` between sessions is still the one-command opt-out it always was.
+- **The tree-state stamp ignored untracked files past the 500th.** A `head -500`
+  meant a change beyond the cap left the state hash unchanged, and verification
+  was skipped. The cap is gone, and hashing is a single process rather than one
+  per file, which made it faster than the version that cut corners.
+- **The tree-state stamp ignored mode-only changes on untracked files.** A helper
+  script could stop being executable while its contents stayed the same, and a
+  `verify.sh` that cared about that bit could be skipped after it should have
+  started failing.
+- **The CI job that proves the gate can fail could not have passed.** It ran the
+  session hook in the workspace and the gate in a sandbox repository. The state
+  is keyed by repository, the keys never matched, and the gate exited 0 while the
+  job asserted 2.
+- **`check_embedded_python.py` could not detect the bug it was written for.** It
+  matched `python3 -c "..."` and searched the body for a double quote, but a
+  double quote in the body is what ends the body. Embedded python now arrives
+  through quoted heredocs and the `-c` form is banned outright, which is a rule
+  that cannot silently miss.
+- **`prove-it init` overwrote and then deleted `.prove-it-demo.sh`** if a
+  repository happened to have a file by that name. The demo copy is now a
+  `mktemp` name.
+- **`recipes/python.sh` failed every diff containing `print(`**, and
+  `recipes/node.sh` every diff containing `console.log`. Both are ordinary output
+  in anything with a command line. A check that cries wolf is one people learn to
+  bypass. Only debuggers and focused tests are flagged now.
+- **`recipes/` was never shellchecked**, though it is the code people copy into
+  their own repositories.
+
+### Changed
+
+- `PostToolUse` also matches `Bash`, so the fallback marker survives a session
+  that began outside the repository it later edits.
+- `prove-it doctor` reports the block budget, and no longer implies that a clean
+  working tree means nothing to prove.
+- The session identifier from the hook payload is sanitised before it becomes
+  part of a filename.
+- [SPEC.md](SPEC.md) gains two requirements: decide by what changed rather than
+  by which tool changed it, and never end a turn silently after a failed
+  verification. Both are things this implementation got wrong.
+
 ## [0.1.0]
 
 First public release. Convention `verify.sh` 0.1, reference implementation, and
@@ -69,5 +136,6 @@ before the first tag. Each has a regression test in `tests/test_gate.sh`.
 - Only Claude Code exposes an end-of-turn hook that can block a turn. Other
   agents can run the gate, but not be stopped by it.
 
-[Unreleased]: https://github.com/WhyNext/prove-it/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/WhyNext/prove-it/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/WhyNext/prove-it/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/WhyNext/prove-it/releases/tag/v0.1.0

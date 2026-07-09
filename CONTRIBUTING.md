@@ -72,3 +72,10 @@ each check delivers.
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). Say in the body what
 changed and why. If you fixed a bug, say how you reproduced it.
+
+## Releases
+
+Maintainers follow [RELEASE.md](RELEASE.md). A release needs a clean local
+`./verify.sh`, green `verify`, `codeql`, and `scorecard` workflows on `main`,
+and the tag workflow's checksum plus provenance attestation. Do not publish from
+an unverified tree.

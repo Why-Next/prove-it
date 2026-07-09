@@ -45,3 +45,10 @@
 ## コミット
 
 Conventional commits(`feat:`、`fix:`、`docs:`、`chore:`)。本文で、何がどう変わり、なぜ変わったかを述べる。バグを直したなら、どう再現したかを述べる。
+
+## リリース
+
+メンテナは [RELEASE.md](../../RELEASE.md) に従う。リリースには、ローカルの
+クリーンな `./verify.sh`、`main` 上で green の `verify`、`codeql`、`scorecard`
+workflow、そして tag workflow からの checksum と provenance attestation が必要だ。
+未検証のツリーから公開してはならない。

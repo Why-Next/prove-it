@@ -13,20 +13,42 @@ Projekt mit einem `Makefile` öffnest. Lies ein unbekanntes `verify.sh`, bevor d
 einen Agenten in dem Repository arbeiten lässt, das es enthält, so wie du ein
 unbekanntes `postinstall`-Skript lesen würdest.
 
-Das Gate läuft nur, wenn die Sitzung Dateien **in genau diesem Repository**
-bearbeitet hat, der Arbeitsbaum schmutzig ist und ein ausführbares `verify.sh`
-im Wurzelverzeichnis des Repos existiert. Ein Repository zu klonen und zu lesen
-löst es nie aus, und ein Repository zu bearbeiten lässt nie das `verify.sh` eines
-anderen Repositorys laufen.
+Das Gate läuft nur, wenn die Sitzung **genau dieses Repository** verändert hat
+und ein ausführbares `verify.sh` in seinem Wurzelverzeichnis existiert. Ein
+Repository zu klonen und zu lesen löst es nie aus, und ein Repository zu
+verändern lässt nie das `verify.sh` eines anderen Repositorys laufen.
+
+`prove-it doctor` ist die Ausnahme, und das ist Absicht: Du hast es gebeten, das
+Gate auszuführen, also führt es `verify.sh` sofort aus, in welchem Repository du
+auch stehst. Führ es nicht in einem Repository aus, dessen `verify.sh` du nicht
+gelesen hast.
+
+Nichts davon ist eine Sandbox. Die Hooks und ihre Buchführung laufen als du, und
+die Shell des Agenten ebenso, also könnte ein Agent, der sich vorgenommen hat,
+das Gate auszuhebeln, das Zustandsverzeichnis löschen und dann `verify.sh`
+entwaffnen. `prove-it` ist ein Schutzgeländer gegen einen Agenten, der
+zuversichtlich falschliegt, und genau den hast du. Es ist keine Grenze gegen
+einen feindseligen. Eine Prüfung, die ein feindseliger Agent nicht erreichen
+kann, muss irgendwo laufen, wo er sie nicht erreichen kann, und dieser Ort ist
+CI.
 
 ## Was es auf die Festplatte schreibt
 
-Zwei Marker, beide in einem privaten Verzeichnis, das mit Modus `0700` angelegt
-wird: `$XDG_STATE_HOME/prove-it/`, oder `~/.local/state/prove-it/`, wenn das
-nicht gesetzt ist. Überschreib es mit `PROVE_IT_STATE_DIR`. Nichts wird in das
-gemeinsame `/tmp` geschrieben, weil diese Dateinamen vom Repository-Pfad
-abgeleitet und daher vorhersehbar sind, und ein vorhersehbarer Name in einem für
-alle beschreibbaren Verzeichnis ist ein Symlink-Ziel.
+Kleine Buchhaltungsdateien, alle in einem privaten Verzeichnis, das mit Modus
+`0700` angelegt wird: `$XDG_STATE_HOME/prove-it/`, oder `~/.local/state/prove-it/`,
+wenn das nicht gesetzt ist. Überschreib es mit `PROVE_IT_STATE_DIR`. Sie halten
+fest, wie der Baum aussah, als eine Sitzung begann, ob das Gate in diesem Moment
+scharf war, in welche Repositorys eine Sitzung geschrieben hat, welche
+Baumzustände bereits bestanden haben und wie oft der aktuelle Zug zurückgeschickt
+wurde. Jede enthält eine Prüfsumme oder eine kleine Ganzzahl, nie Dateiinhalte.
+Nichts wird in das gemeinsame `/tmp` geschrieben, weil diese Dateinamen vom
+Repository-Pfad abgeleitet und daher vorhersehbar sind, und ein vorhersehbarer
+Name in einem für alle beschreibbaren Verzeichnis ist ein Symlink-Ziel.
+
+Die Sitzungskennung kommt in der JSON-Nutzlast des Hooks an und landet in einem
+dieser Dateinamen, also wird sie auf Buchstaben, Ziffern, Bindestrich und
+Unterstrich reduziert, bevor sie verwendet wird. Eine Nutzlast ist keine
+vertrauenswürdige Quelle für Pfadbestandteile.
 
 Das optionale Ledger (`PROVE_IT_LEDGER=1`, **standardmäßig aus**) hängt eine
 JSON-Zeile pro erwischter falscher Fertigmeldung an `~/.prove-it/ledger.jsonl`
@@ -36,7 +58,8 @@ an, angelegt mit Modus `0600` in einem `0700`-Verzeichnis. Jede Zeile hält:
   Zeichen gekürzt und aus deinem lokalen Transkript gezogen, sodass sie alles
   enthalten kann, was in deinem Gespräch stand
 - den absoluten Pfad des Repositorys
-- den Exit-Code und die letzten fünf Zeilen deiner `verify.sh`-Ausgabe
+- den Exit-Code und die Zeilen deiner `verify.sh`-Ausgabe, die einen Fehler
+  benennen
 - einen Zeitstempel
 
 Behandle es als Gesprächsdaten. Nichts in diesem Projekt liest es zurück oder

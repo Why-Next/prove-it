@@ -45,3 +45,9 @@
 ## 提交
 
 使用约定式提交（`feat:`、`fix:`、`docs:`、`chore:`）。在正文里说清楚改了什么以及为什么。如果你修了一个 bug，就说清楚你是怎么复现它的。
+
+## 发布
+
+维护者遵循 [RELEASE.md](../../RELEASE.md)。一次发布需要干净的本地 `./verify.sh`，
+`main` 上绿色的 `verify`、`codeql` 和 `scorecard` workflow，以及 tag workflow
+产出的 checksum 和 provenance attestation。不要从未验证的树发布。

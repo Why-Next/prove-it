@@ -12,19 +12,43 @@ avec un `Makefile`. Lisez un `verify.sh` inconnu avant de laisser un agent
 travailler dans le dépôt qui le contient, comme vous liriez un script
 `postinstall` inconnu.
 
-La barrière ne se lance que lorsque la session a modifié des fichiers **dans ce
-même dépôt**, que l'arbre de travail est sale, et qu'un `verify.sh` exécutable
-existe à la racine du dépôt. Cloner et lire un dépôt ne la déclenche jamais, et
-modifier un dépôt ne fait jamais lancer le `verify.sh` d'un autre dépôt.
+La barrière ne se lance que lorsque la session a changé **ce même dépôt** et
+qu'un `verify.sh` exécutable existe à sa racine. Cloner et lire un dépôt ne la
+déclenche jamais, et changer un dépôt ne fait jamais lancer le `verify.sh` d'un
+autre dépôt.
+
+`prove-it doctor` est l'exception, et c'est délibéré : vous lui avez demandé de
+lancer la barrière, alors il lance `verify.sh` immédiatement, dans le dépôt où
+vous vous trouvez. Ne le lancez pas dans un dépôt dont vous n'avez pas lu le
+`verify.sh`.
+
+Rien de tout cela n'est un bac à sable. Les hooks et leur comptabilité
+s'exécutent en tant que vous, et le shell de l'agent aussi, si bien qu'un agent
+décidé à vaincre la barrière pourrait supprimer le répertoire d'état, puis
+désarmer `verify.sh`. `prove-it` est un garde-fou contre un agent qui a tort
+avec assurance, et c'est celui que vous avez. Ce n'est pas une frontière contre
+un agent hostile. Une vérification qu'un agent hostile ne peut pas atteindre
+doit s'exécuter quelque part où il ne peut pas l'atteindre, et cet endroit,
+c'est la CI.
 
 ## Ce qu'il écrit sur le disque
 
-Deux marqueurs, tous deux dans un répertoire privé créé en mode `0700` :
-`$XDG_STATE_HOME/prove-it/`, ou `~/.local/state/prove-it/` quand cette variable
-n'est pas définie. Remplacez-le avec `PROVE_IT_STATE_DIR`. Rien n'est écrit dans
-le `/tmp` partagé, parce que ces noms de fichiers sont dérivés du chemin du dépôt
-et sont donc prévisibles, et un nom prévisible dans un répertoire ouvert en
-écriture à tous est une cible de lien symbolique.
+De petits fichiers de comptabilité, tous dans un répertoire privé créé en mode
+`0700` : `$XDG_STATE_HOME/prove-it/`, ou `~/.local/state/prove-it/` quand cette
+variable n'est pas définie. Remplacez-le avec `PROVE_IT_STATE_DIR`. Ils
+enregistrent à quoi ressemblait l'arbre au démarrage d'une session, si la
+barrière était armée à ce moment-là, dans quels dépôts une session a écrit,
+quels états de l'arbre ont déjà passé, et combien de fois le tour en cours a été
+renvoyé. Chacun contient une somme de contrôle ou un petit entier, jamais le
+contenu des fichiers. Rien n'est écrit dans le `/tmp` partagé, parce que ces noms
+de fichiers sont dérivés du chemin du dépôt et sont donc prévisibles, et un nom
+prévisible dans un répertoire ouvert en écriture à tous est une cible de lien
+symbolique.
+
+L'identifiant de session arrive dans la charge JSON du hook et se retrouve à
+l'intérieur d'un de ces noms de fichiers, alors il est réduit à des lettres, des
+chiffres, des tirets et des traits de soulignement avant d'être utilisé. Une
+charge n'est pas une source de confiance pour des composants de chemin.
 
 Le registre optionnel (`PROVE_IT_LEDGER=1`, **désactivé par défaut**) ajoute une
 ligne JSON par fausse complétion attrapée à `~/.prove-it/ledger.jsonl`, créé en
@@ -34,7 +58,7 @@ mode `0600` dans un répertoire `0700`. Chaque ligne contient :
   caractères et tiré de votre transcription locale, donc il peut contenir tout ce
   qui était dans votre conversation
 - le chemin absolu du dépôt
-- le code de sortie et les cinq dernières lignes de la sortie de votre `verify.sh`
+- le code de sortie, et les lignes de la sortie de votre `verify.sh` qui nomment un échec
 - un horodatage
 
 Traitez-le comme des données de conversation. Rien dans ce projet ne le relit ni

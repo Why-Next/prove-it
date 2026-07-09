@@ -102,15 +102,43 @@ Uma implementação desta convenção é um portão. Para ser conforme, ela deve
 1. Rodar o `verify.sh` a partir da raiz do repositório antes que o turno do
    agente possa terminar.
 2. Bloquear o turno em uma saída diferente de zero, e mostrar a saída.
-3. Não fazer nada quando o `verify.sh` está ausente ou não é executável.
-4. Não fazer nada quando a sessão não fez edições naquele repositório.
+3. Não fazer nada quando o `verify.sh` não existe como executável quando o portão
+   roda nem existia como executável no início da sessão.
+4. Não fazer nada quando a sessão não mudou aquele repositório.
 5. Fornecer um bypass explícito e localizável com grep. Um bypass silencioso
    ensina as pessoas a desconfiar do portão; um auditado o mantém honesto.
+6. Nunca encerrar um turno em silêncio depois de uma verificação que falhou. Uma
+   implementação que para de bloquear, por qualquer razão, deve dizer isso onde o
+   usuário vai ver.
+
+O ponto 4 pergunta o que mudou, não quem mudou. Uma implementação que decide
+observando quais ferramentas de edição o agente chamou vai perder um arquivo
+reescrito pelo `sed`, um patch aplicado com `git apply`, a saída de um gerador de
+código, e um commit. Commitar é a coisa mais comum que um agente faz, e um portão
+que trata uma árvore de trabalho limpa como nada a provar vai deixar passar
+justamente os turnos que existe para flagrar. Compare o repositório com o que ele
+parecia quando a sessão começou.
+
+O ponto 3 usa os dois momentos de propósito. O stop atual importa para que um
+comando de instalação possa criar `verify.sh` e armar o repositório na mesma
+sessão. O estado inicial importa para que uma exclusão ou um `chmod -x` no meio
+da sessão seja tratado como desarmar o portão, não como uma saída honesta.
+
+O ponto 6 existe porque um portão que pode bloquear para sempre trava a sessão, e
+todo host acaba forçando-o a ceder. Isso é aceitável. O que não é aceitável é
+ceder de um jeito indistinguível de passar.
 
 Ela não deve modificar o `verify.sh`, e deve dizer ao agente que enfraquecer o
 `verify.sh` para passar pelo portão é uma violação, não uma correção. Esse é o
 modo de falha mais provável na prática. Um agente que não consegue passar em uma
 verificação vai, dada a oportunidade, editar a verificação.
+
+A forma mais crua disso é remover a verificação. Uma implementação deveria
+registrar se o `verify.sh` estava presente e executável quando a sessão começou,
+e recusar um turno que termina com ele apagado ou desarmado. Apagar o arquivo
+entre sessões é o opt-out da seção 2 e deve continuar funcionando. Apagá-lo no
+meio da sessão que ele estava prestes a bloquear não é um opt-out, e a diferença
+entre os dois só é visível para uma implementação que olhou antes.
 
 ## 5. Níveis de conformidade
 
@@ -120,6 +148,9 @@ distinção importa mais do que a ambição por trás da convenção.
 **Level 1, o portão.** O `verify.sh` existe, e algo mecanicamente se recusa a
 deixar um turno terminar enquanto ele falha. A implementação de referência em
 `hooks/` impõe isso por completo, e é onde todo repositório deveria começar.
+"Recusa" tem um orçamento: ela manda o turno de volta um número limitado de vezes
+e então cede com um aviso, porque o host não vai deixar um hook bloquear para
+sempre.
 
 **Level 2, a evidência.** As verificações dentro do `verify.sh` cobrem os quatro
 tipos de evidência da seção 3. Nenhuma ferramenta impõe isso, incluindo esta. O

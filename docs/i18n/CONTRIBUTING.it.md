@@ -76,3 +76,10 @@ specifica fornisce ogni controllo.
 
 Conventional commit (`feat:`, `fix:`, `docs:`, `chore:`). Indica nel corpo cosa è
 cambiato e perché. Se hai corretto un bug, indica come lo hai riprodotto.
+
+## Release
+
+I maintainer seguono [RELEASE.md](../../RELEASE.md). Una release richiede un
+`./verify.sh` locale pulito, i workflow `verify`, `codeql` e `scorecard` verdi
+su `main`, e checksum più attestazione di provenienza dal workflow di tag. Non
+pubblicare da un albero non verificato.

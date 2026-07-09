@@ -23,8 +23,8 @@ export PROVE_IT_LEDGER=1
 
 Explain what it will record: the agent's last message before it tried to stop
 (up to 300 characters of conversation text), the repository path, the exit code,
-and the last five lines of `verify.sh` output. It is written to local disk mode
-`0600` and is never transmitted. Do not turn it on for them.
+and the lines of `verify.sh` output that name a failure. It is written to local
+disk mode `0600` and is never transmitted. Do not turn it on for them.
 
 ## If it exists
 

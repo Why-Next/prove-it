@@ -45,3 +45,7 @@ accents हमेशा बनाए रखें। dash नियम छह �
 ## कमिट
 
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)। body में बताएँ कि क्या बदला और क्यों। अगर आपने कोई bug ठीक किया, तो बताएँ कि आपने उसे कैसे reproduce किया।
+
+## Releases
+
+Maintainers [RELEASE.md](../../RELEASE.md) का पालन करते हैं। Release के लिए clean local `./verify.sh`, `main` पर green `verify`, `codeql`, और `scorecard` workflows, और tag workflow का checksum plus provenance attestation चाहिए। Unverified tree से publish न करें।

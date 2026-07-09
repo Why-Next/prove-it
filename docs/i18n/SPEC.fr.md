@@ -105,16 +105,46 @@ doit :
 1. Lancer `verify.sh` depuis la racine du dépôt avant que le tour de l'agent
    puisse se terminer.
 2. Bloquer le tour sur une sortie non nulle, et faire remonter la sortie.
-3. Ne rien faire quand `verify.sh` est absent ou non exécutable.
-4. Ne rien faire quand la session n'a apporté aucune modification à ce dépôt.
+3. Ne rien faire quand `verify.sh` n'existe pas comme exécutable au moment où la
+   barrière s'exécute et n'existait pas comme exécutable au début de la session.
+4. Ne rien faire quand la session n'a pas changé ce dépôt.
 5. Fournir un contournement explicite et repérable au grep. Un contournement
    silencieux apprend aux gens à se méfier de la barrière ; un contournement
    audité la garde honnête.
+6. Ne jamais terminer un tour en silence après une vérification en échec. Une
+   implémentation qui cesse de bloquer, pour quelque raison que ce soit, doit le
+   dire là où l'utilisateur le verra.
+
+Le point 4 demande ce qui a changé, pas qui a changé. Une implémentation qui
+décide en observant quels outils d'édition l'agent a appelés manquera un fichier
+réécrit par `sed`, un correctif appliqué avec `git apply`, la sortie d'un
+générateur de code, et un commit. Committer est la chose la plus ordinaire qu'un
+agent fasse, et une barrière qui traite un arbre de travail propre comme s'il n'y
+avait rien à prouver laissera passer les tours mêmes qu'elle existe pour
+attraper. Comparez le dépôt à ce à quoi il ressemblait au début de la session.
+
+Le point 3 utilise ces deux moments délibérément. Le stop actuel compte pour
+qu'une commande d'installation puisse créer `verify.sh` et armer le dépôt dans
+la même session. L'état initial compte pour qu'une suppression ou un `chmod -x`
+au milieu de la session soit traitée comme un désarmement de la barrière, et non
+comme un retrait honnête.
+
+Le point 6 existe parce qu'une barrière qui peut bloquer indéfiniment fait se
+figer la session, et tout hôte finit par la forcer à céder. C'est très bien. Ce
+qui ne va pas, c'est de céder d'une manière indiscernable du fait de passer.
 
 Elle ne doit pas modifier `verify.sh`, et elle doit dire à l'agent qu'affaiblir
 `verify.sh` pour franchir la barrière est une violation plutôt qu'un correctif.
 C'est le mode d'échec le plus probable en pratique. Un agent qui n'arrive pas à
 passer une vérification, si l'occasion se présente, modifiera la vérification.
+
+La forme la plus grossière de cela est de retirer la vérification. Une
+implémentation devrait enregistrer si `verify.sh` était présent et exécutable au
+début de la session, et refuser un tour qui se termine avec ce fichier supprimé
+ou désarmé. Supprimer le fichier entre les sessions est le retrait de la section
+2 et doit continuer de fonctionner. Le supprimer au milieu de la session qu'il
+était sur le point de bloquer n'est pas un retrait, et la différence entre les
+deux n'est visible que pour une implémentation qui a regardé avant.
 
 ## 5. Les niveaux de conformité
 
@@ -124,7 +154,9 @@ distinction compte plus que l'ambition derrière la convention.
 **Level 1, la barrière.** `verify.sh` existe, et quelque chose refuse
 mécaniquement de laisser un tour se terminer tant qu'il échoue. L'implémentation
 de référence dans `hooks/` l'impose entièrement, et c'est là que chaque dépôt
-devrait commencer.
+devrait commencer. "Refuse" a un budget : elle renvoie le tour un nombre borné de
+fois puis cède avec un avertissement, parce que l'hôte ne laissera pas un hook
+bloquer indéfiniment.
 
 **Level 2, les preuves.** Les vérifications à l'intérieur de `verify.sh` couvrent
 les quatre types de preuves de la section 3. Aucun outil ne l'impose, celui-ci
