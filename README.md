@@ -1,5 +1,17 @@
 # prove-it
 
+English ·
+[中文](docs/i18n/README.zh.md) ·
+[Deutsch](docs/i18n/README.de.md) ·
+[日本語](docs/i18n/README.ja.md) ·
+[हिन्दी](docs/i18n/README.hi.md) ·
+[Français](docs/i18n/README.fr.md) ·
+[Italiano](docs/i18n/README.it.md) ·
+[Português](docs/i18n/README.pt.md) ·
+[Русский](docs/i18n/README.ru.md) ·
+[Español](docs/i18n/README.es.md) ·
+[한국어](docs/i18n/README.ko.md)
+
 **Your agent cannot end its turn until your repo proves itself.**
 
 Coding agents say "tests pass" without running them, and "fixed" without ever
@@ -55,6 +67,37 @@ chmod +x verify.sh
 
 That is the whole setup. There is no `verify.sh` in your repo yet, so until you
 write one, the gate does nothing at all.
+
+## Your first five minutes
+
+Start smaller than you think. A `verify.sh` that only runs `git diff --check`
+is already worth having, and it will pass, which teaches you the gate is quiet
+when things are fine.
+
+```bash
+printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
+chmod +x verify.sh
+./verify.sh                 # run it yourself first. Never ship a check you have not seen pass.
+```
+
+Now watch it fail on purpose, so you know the gate is real:
+
+```bash
+sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
+```
+
+Ask your agent to edit any file, then let it finish. It will try to end its
+turn, the gate will run `verify.sh`, and the turn will be blocked. Undo the
+`exit 1` and the same agent sails through.
+
+From there, add one real check at a time: the test command you actually run,
+then the type checker, then the diff hygiene. Every check you add is a sentence
+in your answer to *what does proven mean here*. Stop when the whole thing takes
+about a minute.
+
+The mistake to avoid is writing an ambitious `verify.sh` on day one. A slow or
+flaky gate gets bypassed within a week, and a bypassed gate is worse than none:
+it tells you a check happened when it did not.
 
 ## How it decides to run
 

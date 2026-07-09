@@ -18,6 +18,12 @@ fi
 # The example settings file has to be valid JSON, or the install silently fails.
 python3 -c "import json; json.load(open('hooks/settings.example.json'))"
 
+# Prose hygiene across every language: plain hyphens only.
+python3 scripts/check_no_long_dash.py
+
+# Cross-check: every translation still agrees with the English original.
+python3 scripts/check_i18n.py
+
 # Reproduction: the gate blocks a failing repo and allows a passing one.
 bash tests/test_gate.sh
 
