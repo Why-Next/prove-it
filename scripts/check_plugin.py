@@ -64,8 +64,10 @@ def check_hooks(errors: list[str]) -> None:
     if not data:
         return
     events = data.get("hooks", {})
-    if not {"Stop", "PostToolUse"} <= set(events):
-        errors.append("hooks.json must register both Stop and PostToolUse")
+    required = {"Stop", "PostToolUse", "SessionStart"}
+    missing = required - set(events)
+    if missing:
+        errors.append(f"hooks.json does not register {sorted(missing)}")
 
     # Every command a hook fires has to exist, with ${CLAUDE_PLUGIN_ROOT} standing
     # in for this repo.
@@ -83,6 +85,26 @@ def check_hooks(errors: list[str]) -> None:
                     errors.append(
                         f"{event} hook command must use ${{CLAUDE_PLUGIN_ROOT}}, "
                         f"not a path relative to the user's cwd: {command}")
+
+
+def check_cli(errors: list[str]) -> None:
+    """The install flow runs through bin/prove-it, so it has to be there."""
+    cli = ROOT / "bin" / "prove-it"
+    if not cli.is_file():
+        errors.append("bin/prove-it is missing")
+        return
+    if not cli.stat().st_mode & 0o111:
+        errors.append("bin/prove-it is not executable")
+
+    text = cli.read_text(encoding="utf-8")
+    for sub in ("init", "doctor", "ledger"):
+        if f"cmd_{sub}" not in text:
+            errors.append(f"bin/prove-it has no {sub} subcommand")
+
+    # /prove-it:init shells out to the CLI. A rename would strand the command.
+    init = (ROOT / "commands" / "init.md").read_text(encoding="utf-8")
+    if "bin/prove-it" not in init:
+        errors.append("commands/init.md no longer calls bin/prove-it")
 
 
 def check_commands(errors: list[str]) -> None:
@@ -147,6 +169,7 @@ def main() -> int:
     errors: list[str] = []
     check_marketplace(errors)
     check_hooks(errors)
+    check_cli(errors)
     check_commands(errors)
     check_versions(errors)
     run_official_validator(errors)

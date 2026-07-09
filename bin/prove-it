@@ -1,0 +1,245 @@
+#!/bin/bash
+# prove-it command line interface.
+#
+#   prove-it init      write a verify.sh for this repository, then prove it works
+#   prove-it doctor    report whether the gate would run here, and why not
+#   prove-it ledger    summarise the false completions the gate has caught
+#
+# No dependencies beyond bash, git, and python3. Nothing here talks to a network.
+
+set -u
+
+SELF=$(basename "$0")
+
+die()  { printf '%s: %s\n' "$SELF" "$1" >&2; exit 1; }
+say()  { printf '%s\n' "$1"; }
+
+repo_root() {
+    git rev-parse --show-toplevel 2>/dev/null || die "not inside a git repository"
+}
+
+# ---------------------------------------------------------------- detect stack
+
+detect_stack() {  # repo root -> node | python | go | flutter | generic
+    local root=$1
+    [ -f "$root/pubspec.yaml" ]     && { echo flutter; return; }
+    [ -f "$root/go.mod" ]           && { echo go;      return; }
+    [ -f "$root/package.json" ]     && { echo node;    return; }
+    if [ -f "$root/pyproject.toml" ] || [ -f "$root/requirements.txt" ]; then
+        echo python; return
+    fi
+    echo generic
+}
+
+# The generated verify.sh must pass on the day it is written. Anything a repo
+# might currently fail is written commented out, for the author to switch on
+# once they have watched it pass by hand. A gate that fails on main teaches
+# people to bypass it in week one.
+suggestions_for() {
+    case $1 in
+        node)    printf '%s\n' '# npm test' '# npx tsc --noEmit' '# npm run lint --if-present' ;;
+        python)  printf '%s\n' '# python -m pytest -q' '# python -m ruff check .' '# python -m mypy .' ;;
+        go)      printf '%s\n' '# go test ./...' '# go vet ./...' '# test -z "$(gofmt -l .)"' ;;
+        flutter) printf '%s\n' '# flutter analyze' '# flutter test' '# dart format --output=none --set-exit-if-changed .' ;;
+        *)       printf '%s\n' '# add the command you actually run before you trust a change' ;;
+    esac
+}
+
+cmd_init() {
+    local root; root=$(repo_root)
+    local verify="$root/verify.sh"
+
+    if [ -e "$verify" ]; then
+        say "$SELF: $verify already exists. Leaving it alone."
+        say ""
+        say "If you want to extend it, open it and add one check at a time."
+        exit 0
+    fi
+
+    local stack; stack=$(detect_stack "$root")
+    say "$SELF: detected $stack"
+    say ""
+
+    {
+        echo '#!/bin/bash'
+        echo '# What would have to be true for a change here to be provably safe'
+        echo '# to hand back? Answer it one check at a time. Keep it under a minute.'
+        echo 'set -eu'
+        echo 'cd "$(dirname "$0")"'
+        echo ''
+        echo '# Diff hygiene: no conflict markers, no whitespace damage.'
+        echo 'git diff --check'
+        echo ''
+        echo "# Uncomment each line below once you have watched it pass by hand."
+        suggestions_for "$stack"
+        echo ''
+        echo 'echo "verify.sh OK"'
+    } > "$verify"
+    chmod +x "$verify"
+
+    say "wrote verify.sh with one active check (git diff --check) and $stack"
+    say "suggestions commented out. It passes today, on purpose."
+    say ""
+
+    say "running it, so you have seen it pass:"
+    say ""
+    if ( cd "$root" && bash ./verify.sh ); then
+        say ""
+    else
+        say ""
+        die "the generated verify.sh failed. Your working tree has a diff problem. Fix that first."
+    fi
+
+    # A user who has never watched the gate refuse a turn will not trust it later.
+    #
+    # The copy has to live inside the repository. verify.sh starts with
+    # `cd "$(dirname "$0")"`, so a copy under /tmp would cd to /tmp and fail
+    # because it is not a git repository, which demonstrates the wrong thing.
+    say "now proving it can fail. Running a copy with 'exit 1' appended:"
+    say ""
+    local demo="$root/.prove-it-demo.sh"
+    trap 'rm -f "$demo"' EXIT INT TERM
+    cat "$verify" > "$demo"
+    echo 'exit 1' >> "$demo"
+    chmod +x "$demo"
+    local rc=0
+    ( cd "$root" && bash ./.prove-it-demo.sh ) || rc=$?
+    rm -f "$demo"
+    trap - EXIT INT TERM
+    say "  -> exit $rc  (this is what blocks a turn)"
+    say ""
+    say "Done. Edit verify.sh to switch on the checks you want."
+}
+
+# --------------------------------------------------------------------- doctor
+
+cmd_doctor() {
+    local ok=0
+    local root
+    if ! root=$(git rev-parse --show-toplevel 2>/dev/null); then
+        say "repository   no (the gate never runs outside a git repository)"
+        exit 1
+    fi
+    say "repository   $root"
+
+    local verify="$root/verify.sh"
+    if [ ! -e "$verify" ]; then
+        say "verify.sh    absent, so the gate does nothing here"
+        say ""
+        say "Run '$SELF init' to write one."
+        exit 1
+    elif [ ! -x "$verify" ]; then
+        say "verify.sh    present but not executable, so the gate skips it"
+        say ""
+        say "Fix with: chmod +x verify.sh"
+        exit 1
+    else
+        say "verify.sh    present and executable"
+    fi
+
+    if [ -n "$(git -C "$root" status --porcelain 2>/dev/null | head -1)" ]; then
+        say "working tree dirty, so the gate would run on the next stop"
+    else
+        say "working tree clean, so the gate is skipped until you change something"
+    fi
+
+    local state="${PROVE_IT_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/prove-it}"
+    say "state        $state"
+
+    if [ "${PROVE_IT_LEDGER:-}" = "1" ]; then
+        say "ledger       on  (${PROVE_IT_LEDGER_DIR:-$HOME/.prove-it}/ledger.jsonl)"
+    else
+        say "ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)"
+    fi
+
+    [ "${PROVE_IT_SKIP:-}" = "1" ] && { say "PROVE_IT_SKIP is 1, so the gate is bypassed"; ok=1; }
+
+    say ""
+    say "running verify.sh:"
+    say ""
+    if ( cd "$root" && bash ./verify.sh ); then
+        say ""
+        say "verify.sh passes. A turn ending now would be allowed through."
+    else
+        local rc=$?
+        say ""
+        say "verify.sh exits $rc. A turn ending now would be blocked."
+        ok=1
+    fi
+    exit $ok
+}
+
+# --------------------------------------------------------------------- ledger
+
+cmd_ledger() {
+    local dir="${PROVE_IT_LEDGER_DIR:-$HOME/.prove-it}"
+    local file="$dir/ledger.jsonl"
+
+    if [ ! -f "$file" ]; then
+        say "$SELF: no ledger at $file"
+        say ""
+        say "The ledger is off by default. Turn it on with:"
+        say ""
+        say "    export PROVE_IT_LEDGER=1"
+        say ""
+        say "It records, on local disk only, what the agent claimed and what was true."
+        exit 0
+    fi
+
+    python3 - "$file" <<'PY'
+import collections, json, sys
+
+path = sys.argv[1]
+rows = []
+with open(path, encoding="utf-8") as fh:
+    for line in fh:
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue
+
+if not rows:
+    print("ledger is empty. The gate has caught nothing yet.")
+    sys.exit(0)
+
+print(f"{len(rows)} caught false completion(s) in {path}\n")
+
+repos = collections.Counter(r.get("repo", "?") for r in rows)
+if len(repos) > 1:
+    print("by repository")
+    for repo, n in repos.most_common():
+        print(f"  {n:>4}  {repo}")
+    print()
+
+print("what the agent claimed")
+for row in rows[-5:]:
+    claim = (row.get("claim") or "(no message recorded)").replace("\n", " ")
+    if len(claim) > 88:
+        claim = claim[:88] + "..."
+    print(f"  {row.get('ts', '?')}  {claim}")
+
+print("\nwhat was actually wrong")
+for row in rows[-5:]:
+    actual = row.get("actual") or []
+    print(f"  exit {row.get('exit_code', '?')}  {actual[-1] if actual else '(no output)'}")
+
+codes = collections.Counter(r.get("exit_code") for r in rows)
+if len(codes) == 1 and len(rows) > 3:
+    print("\nEvery entry has the same exit code. That usually means one broken "
+          "check rather than a lying agent.")
+PY
+}
+
+case "${1:-}" in
+    init)   shift; cmd_init "$@" ;;
+    doctor) shift; cmd_doctor "$@" ;;
+    ledger) shift; cmd_ledger "$@" ;;
+    ""|-h|--help|help)
+        say "usage: $SELF <command>"
+        say ""
+        say "  init     write a verify.sh for this repository, then prove it works"
+        say "  doctor   report whether the gate would run here, and why not"
+        say "  ledger   summarise the false completions the gate has caught"
+        ;;
+    *) die "unknown command '$1'. Try '$SELF help'." ;;
+esac

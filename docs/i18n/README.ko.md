@@ -29,61 +29,46 @@
 
 ## 설치
 
-Claude Code 플러그인으로:
+세 줄이면 되고, 실제 일은 세 번째 줄이 합니다:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-플러그인은 훅 두 개를 등록합니다. 하나는 세션이 파일을 편집했다는 걸 표시하고, 하나는 차례를 게이트합니다. 그리고 명령 두 개를 추가합니다. `/prove-it:init`은 첫 `verify.sh`를 작성해주고, `/prove-it:ledger`는 게이트가 잡아낸 것을 다시 읽어줍니다.
+`/prove-it:init`은 스택을 감지해 `verify.sh`를 작성하고, 그걸 실행해 통과하는 걸 직접 보게 한 다음, `exit 1`을 덧붙인 사본을 돌려 게이트가 차례를 거부하는 걸 직접 보게 합니다. 30초쯤 걸리고, 이미 있는 `verify.sh`는 절대 덮어쓰지 않습니다.
 
-다른 에이전트라면, 레포를 클론해서 같은 훅 두 개를 직접 연결하세요. 훅은 평범한 bash이고 `bash`, `git`, `python3`만 있으면 됩니다:
+생성된 게이트에는 활성화된 검사가 딱 하나, `git diff --check`뿐이고, 스택에 맞는 검사들은 주석으로 적어 둡니다. 설치하는 그날 통과하도록 일부러 그렇게 해뒀습니다. 안착한 날 `main`에서 실패하는 게이트는 사람들에게 첫 주부터 우회하는 법을 가르칩니다. 주석 처리된 검사는 하나씩, 각각 손으로 직접 통과하는 걸 지켜본 뒤에 켜세요.
+
+그 밖에는 아무것도 설정되지 않고, `verify.sh`가 존재하기 전까지는 아무것도 돌지 않습니다. `verify.sh`가 없는 레포를 열면, 플러그인은 조용히 있으면서 당신이 보호받고 있다고 넘겨짚게 두는 대신 세션 시작 시점에 그 사실을 알려줍니다.
+
+## 플러그인 없이
+
+훅은 평범한 bash이고 `bash`, `git`, `python3`만 있으면 됩니다:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 [`hooks/settings.example.json`](../../hooks/settings.example.json)을 레포 하나에만 적용하려면 그 레포의 `.claude/settings.json`에, 전부에 적용하려면 `~/.claude/settings.json`에 병합하세요. 게이트는 stdin으로 Stop 훅 JSON 페이로드를 읽고 종료 코드로 답하므로, 차례가 끝나는 시점에 스크립트를 돌릴 수 있는 것이라면 무엇이든 이걸 구동할 수 있습니다.
 
-그런 다음 정말 중요한 파일을 작성하세요:
+`prove-it doctor`는 지금 서 있는 레포에서 게이트가 작동할지를 알려주고, 작동하지 않는다면 무엇이 막고 있는지 말해줍니다:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-그 파일이 존재하기 전까지 게이트는 아무 일도 하지 않습니다.
+## 게이트 키우기
 
-## 처음 5분
+검사를 하나 추가할 때마다, 이 레포에서 "증명됐다"는 게 무슨 뜻인가라는 질문에 대한 답이 한 문장씩 채워집니다. 실제로 돌리는 테스트 명령을 넣고, 그다음 타입 체커, 그다음 리뷰에서 자꾸 걸리는 것을 넣으세요. 스크립트 전체가 대략 1분쯤 걸리는 지점에서 멈추세요. 느린 검사는 CI에 둡니다.
 
-원하는 것보다 더 작게 시작하세요. `git diff --check`만 돌리는 `verify.sh`도 갖출 가치가 있고, 통과합니다. 레포 상태가 괜찮을 때 게이트가 조용히 있다는 걸 보여주니까요.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-이제 일부러 실패하게 만들어 보세요:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-에이전트에게 아무 파일이나 편집하게 시키고 마무리하도록 두세요. 에이전트는 차례를 끝내려 하고, 게이트가 `verify.sh`를 실행하고, 차례는 열린 채로 남습니다. `exit 1`을 지우면 같은 에이전트가 무사히 통과합니다. 실패하는 걸 직접 지켜보지 않은 검사는 절대 내보내지 마세요.
-
-거기서부터 진짜 검사를 한 번에 하나씩 추가하세요. 실제로 돌리는 테스트 명령, 그다음 타입 체커, 그다음 diff 위생 검사. 검사를 하나 추가할 때마다, 이 레포에서 "증명됐다"는 게 무슨 뜻인가라는 질문에 대한 답이 한 문장씩 채워집니다. 스크립트 전체가 대략 1분쯤 걸리는 지점에서 멈추세요.
+검사를 켜기 전에 하나하나 손으로 직접 돌려보세요. 실패하는 걸 지켜보지 않은 검사도 절대 내보내지 마세요. 실패할 수 없는 검사는 검사가 아니고, 정작 필요한 날에 가서야 그걸 알게 되니까요.
 
 흔한 실수는 첫날부터 야심 찬 `verify.sh`를 작성하는 겁니다. 느리거나 불안정한 게이트는 일주일 안에 우회당하고, 우회당한 게이트는 게이트가 없는 것보다 못합니다. 아무것도 돌지 않았는데 검사가 돌았다고 보고하니까요.
 
@@ -138,7 +123,7 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
  "evidence_demanded":"verify.sh exit 0","actual":["3 failed, 41 passed"]}
 ```
 
-그 줄은 에이전트가 무엇을 주장했고, 무엇을 요구받았고, 무엇이 사실로 드러났는지를 기록합니다. 파일은 `0600` 모드로 로컬 디스크에 쓰이고, 어디로도 전송되지 않으며, 당신이 켜기 전까지는 꺼져 있습니다. 한 달치 기록이 쌓이면 에이전트가 어떻게 실패하는지 짐작하는 대신 그냥 읽으면 됩니다. `/prove-it:ledger`가 파일을 요약해줍니다.
+그 줄은 에이전트가 무엇을 주장했고, 무엇을 요구받았고, 무엇이 사실로 드러났는지를 기록합니다. 파일은 `0600` 모드로 로컬 디스크에 쓰이고, 어디로도 전송되지 않으며, 당신이 켜기 전까지는 꺼져 있습니다. 한 달치 기록이 쌓이면 에이전트가 어떻게 실패하는지 짐작하는 대신 그냥 읽으면 됩니다. `/prove-it:ledger`가 파일을 요약해주고, 명령줄에서는 `prove-it ledger`가 같은 일을 합니다.
 
 ## 이 레포는 스스로를 게이트합니다
 

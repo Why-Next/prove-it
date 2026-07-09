@@ -29,63 +29,48 @@
 
 ## インストール
 
-Claude Code プラグインとして:
+3行。そして肝心の仕事をするのは3行目だ:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-プラグインは2つのフックを登録する。1つはセッションがファイルを編集したことを記録し、もう1つはターンをゲートする。さらに2つのコマンドを追加する。`/prove-it:init` は最初の `verify.sh` を書き、`/prove-it:ledger` はゲートが検出したものを読み返す。
+`/prove-it:init` はあなたのスタックを検出し、`verify.sh` を書き、それを走らせて通るのをあなたに見せ、それから `exit 1` を末尾に足したコピーを走らせて、ゲートがターンを拒むのをあなたに見せる。だいたい30秒で終わり、すでに持っている `verify.sh` を上書きすることは決して無い。
 
-他のエージェントを使う場合は、リポジトリをクローンして同じ2つのフックを自分で配線する。これらは素の bash で、`bash`、`git`、`python3` だけあればよい:
+生成されるゲートには、有効なチェックがちょうど1つだけある。`git diff --check` だ。あなたのスタック向けのチェックはコメントとして書き込まれている。インストールしたその日には通る。これは意図的だ。着地したその日に `main` で失敗するゲートは、最初の1週間で人にそれを迂回することを教えてしまう。コメントアウトされたチェックは、1つずつ有効にしていく。それぞれが自分の手で通るのを見届けた後で。
+
+ほかには何も設定されないし、`verify.sh` が存在するまで何も走らない。`verify.sh` を持たないリポジトリを開いたら、プラグインはセッションの最初にそう告げる。黙ったまま、あなたが守られていると思い込ませておくのではなく。
+
+## プラグインなしで
+
+フックは素の bash で、`bash`、`git`、`python3` だけあればよい:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 [`hooks/settings.example.json`](../../hooks/settings.example.json) を、1つのリポジトリだけなら `.claude/settings.json` に、すべてのリポジトリなら `~/.claude/settings.json` にマージする。ゲートは Stop hook の JSON ペイロードを標準入力から読み、終了コードで応答する。だから、ターン終了時にスクリプトを走らせられるものなら何でもこれを駆動できる。
 
-そして、肝心のファイルを書く:
+`prove-it doctor` は、あなたが今いるリポジトリでゲートが作動するかどうかに答え、作動しないならその原因が何かを教える:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-そのファイルが存在するまで、ゲートは何もしない。
+## ゲートを育てる
 
-## 最初の5分
+あなたが足すチェックの1つ1つが、このリポジトリで「証明済み」とは何を意味するかという問いへの答えの1文だ。実際に走らせているテストコマンドを足し、次に型チェッカー、次にレビューが繰り返し捕まえているものを何でも足す。スクリプト全体でだいたい1分かかるところで止める。遅いチェックは CI に属する。
 
-望むより小さく始めよう。`git diff --check` だけを走らせる `verify.sh` でも持つ価値があり、それは通る。通ることで、リポジトリが良い状態のときゲートは静かなままだと分かる。
+有効にする前に、どのチェックも自分の手で走らせること。失敗するのを見届けていないチェックも、決して出荷しないこと。失敗しえないチェックはチェックではないし、そのことに、それが必要になる日に気づくことはない。
 
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-次に、わざと失敗させる:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-エージェントに何かファイルを編集させて、そのまま終わらせる。エージェントはターンを終えようとし、ゲートが `verify.sh` を実行し、ターンは開いたままになる。`exit 1` を取り除けば、同じエージェントがすんなり通り抜ける。失敗するのを自分の目で見ていないチェックは、決して出荷しないこと。
-
-そこから、本物のチェックを一度に1つずつ足していく。実際に走らせているテストコマンド、次に型チェッカー、次に diff の衛生確認。足すチェックの1つ1つが、このリポジトリで「証明済み」とは何を意味するかという問いへの答えの1文になる。スクリプト全体でだいたい1分かかるところで止める。
-
-よくある間違いは、初日から野心的な `verify.sh` を書くことだ。遅かったり不安定だったりするゲートは1週間で迂回されるようになり、迂回されたゲートは無いよりも悪い。何も走っていないのに、チェックが走ったと報告するからだ。
+よくある間違いは、初日から野心的な `verify.sh` を書くことだ。遅かったり不安定だったりするゲートは1週間のうちに迂回されるようになり、迂回されたゲートは無いよりも悪い。何も走っていないのに、チェックが走ったと報告するからだ。
 
 ## 実行するかどうかの判断
 
@@ -138,7 +123,7 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
  "evidence_demanded":"verify.sh exit 0","actual":["3 failed, 41 passed"]}
 ```
 
-その行は、エージェントが何を主張し、何を求められ、何が真だと分かったかを記録する。ファイルはモード `0600` でローカルディスクに書かれ、どこにも送信されず、あなたが有効にするまではオフのままだ。1か月分のエントリがたまれば、エージェントがどう失敗するかを推測するのをやめて、代わりにそれを読める。`/prove-it:ledger` がファイルを要約してくれる。
+その行は、エージェントが何を主張し、何を求められ、何が真だと分かったかを記録する。ファイルはモード `0600` でローカルディスクに書かれ、どこにも送信されず、あなたが有効にするまではオフのままだ。1か月分のエントリがたまれば、エージェントがどう失敗するかを推測するのをやめて、代わりにそれを読める。`/prove-it:ledger` がファイルを要約してくれる。コマンドラインでは `prove-it ledger` が同じことをする。
 
 ## このリポジトリは自分自身をゲートする
 

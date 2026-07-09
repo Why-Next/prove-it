@@ -36,22 +36,35 @@ acabado con la palabra "hecho".
 
 ## Instalación
 
-Como plugin de Claude Code:
+Tres líneas, y la tercera hace el trabajo:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-El plugin registra dos hooks, uno para marcar que una sesión editó archivos y otro para
-poner la barrera al turno, y añade dos comandos: `/prove-it:init` escribe tu primer
-`verify.sh`, y `/prove-it:ledger` te muestra lo que la barrera ha detectado.
+`/prove-it:init` detecta tu stack, escribe un `verify.sh`, lo ejecuta para que lo veas pasar,
+luego ejecuta una copia con `exit 1` añadido para que veas cómo la barrera rechaza un turno.
+Tarda alrededor de treinta segundos y nunca sobrescribe un `verify.sh` que ya tengas.
 
-Para cualquier otro agente, clona el repositorio y conecta los mismos dos hooks. Son bash
-puro y solo necesitan `bash`, `git` y `python3`:
+La barrera generada tiene exactamente una comprobación activa, `git diff --check`, con las
+comprobaciones para tu stack escritas como comentarios. Pasa el día que la instalas, a
+propósito. Una barrera que falla en `main` el día que aterriza enseña a la gente a eludirla en
+la primera semana. Activa las comprobaciones comentadas una a una, después de haber visto
+pasar cada una a mano.
+
+No se configura nada más, y nada se ejecuta hasta que exista un `verify.sh`. Si abres un
+repositorio que no tiene ninguno, el plugin lo dice al inicio de la sesión en vez de quedarse
+callado y dejar que supongas que estás cubierto.
+
+## Sin el plugin
+
+Los hooks son bash puro y solo necesitan `bash`, `git` y `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Fusiona [`hooks/settings.example.json`](../../hooks/settings.example.json) en tu
@@ -59,51 +72,27 @@ Fusiona [`hooks/settings.example.json`](../../hooks/settings.example.json) en tu
 La barrera lee una carga JSON del Stop hook por stdin y responde con un código de salida,
 así que cualquier cosa que pueda ejecutar un script al final del turno puede manejarla.
 
-Luego escribe el archivo que importa:
+`prove-it doctor` responde si la barrera se dispararía en el repositorio en el que te
+encuentras, y te dice qué la está frenando si no lo haría:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Hasta que ese archivo exista, la barrera no hace absolutamente nada.
+## Hacer crecer la barrera
 
-## Tus primeros cinco minutos
+Cada comprobación que añades es una frase en tu respuesta a la pregunta de qué significa
+"demostrado" en este repositorio. Añade el comando de pruebas que realmente ejecutas, luego el
+verificador de tipos, luego lo que tus revisiones sigan detectando. Detente cuando todo el
+script tarde alrededor de un minuto; las comprobaciones lentas pertenecen a CI.
 
-Empieza más pequeño de lo que querrías. Un `verify.sh` que solo ejecuta `git diff --check`
-ya vale la pena, y pasa, lo que te muestra que la barrera se queda callada cuando el
-repositorio está en buen estado.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Ahora haz que falle a propósito:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Pídele al agente que edite cualquier archivo y déjalo terminar. Intentará terminar el turno,
-la barrera ejecutará `verify.sh`, y el turno se quedará abierto. Quita el `exit 1` y el mismo
-agente pasa sin problemas. Nunca publiques una comprobación que no hayas visto fallar.
-
-A partir de ahí, añade una comprobación real cada vez: el comando de pruebas que realmente
-ejecutas, luego el verificador de tipos, luego la higiene del diff. Cada comprobación que
-añades es una frase en tu respuesta a la pregunta de qué significa "demostrado" en este
-repositorio. Detente cuando todo el script tarde alrededor de un minuto.
+Ejecuta cada comprobación a mano antes de activarla. Tampoco publiques nunca una comprobación
+que no hayas visto fallar: una comprobación que no puede fallar no es una comprobación, y no lo
+descubrirás el día que la necesites.
 
 El error común es escribir un `verify.sh` ambicioso el primer día. Una barrera lenta o
 inestable se elude en una semana, y una barrera eludida es peor que ninguna, porque informa
@@ -183,7 +172,8 @@ Establece `PROVE_IT_LEDGER=1` y cada finalización falsa detectada añade una l�
 La línea registra lo que el agente afirmó, lo que se le exigió y lo que resultó ser verdad.
 El archivo se escribe en disco local con modo `0600`, nada lo transmite a ninguna parte, y
 permanece apagado hasta que lo enciendes. Tras un mes de entradas puedes dejar de adivinar
-cómo falla tu agente y leerlo en su lugar. `/prove-it:ledger` te resume el archivo.
+cómo falla tu agente y leerlo en su lugar. `/prove-it:ledger` te resume el archivo, igual que
+`prove-it ledger` en la línea de comandos.
 
 ## Este repo se pone la barrera a sí mismo
 

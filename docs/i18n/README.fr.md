@@ -38,24 +38,39 @@ tours se seraient autrement terminés sur le mot "terminé".
 
 ## Installation
 
-En tant que plugin Claude Code :
+Trois lignes, et c'est la troisième qui fait le travail :
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-Le plugin enregistre deux hooks, l'un pour marquer qu'une session a modifié des
-fichiers et l'autre pour mettre le tour sous barrière, et ajoute deux commandes :
-`/prove-it:init` écrit votre premier `verify.sh`, et `/prove-it:ledger` relit ce
-que la barrière a attrapé.
+`/prove-it:init` détecte votre stack, écrit un `verify.sh`, le lance pour que
+vous le voyiez passer, puis lance une copie avec `exit 1` ajouté pour que vous
+voyiez la barrière refuser un tour. Cela prend environ trente secondes et
+n'écrase jamais un `verify.sh` que vous avez déjà.
 
-Pour tout autre agent, clonez le dépôt et branchez vous-même les deux mêmes
-hooks. Ce sont de simples scripts bash qui n'ont besoin que de `bash`, `git` et
+La barrière générée a exactement une vérification active, `git diff --check`,
+avec les vérifications pour votre stack écrites en commentaires. Elle passe le
+jour où vous l'installez, délibérément. Une barrière qui échoue sur `main` le
+jour de son arrivée apprend aux gens à la contourner dès la première semaine.
+Activez les vérifications commentées une à la fois, après avoir vu chacune passer
+à la main.
+
+Rien d'autre n'est configuré, et rien ne se lance tant qu'un `verify.sh`
+n'existe pas. Si vous ouvrez un dépôt qui n'en a pas, le plugin le dit au début
+de la session plutôt que de rester silencieux et de vous laisser supposer que
+vous êtes couvert.
+
+## Sans le plugin
+
+Les hooks sont de simples scripts bash et n'ont besoin que de `bash`, `git` et
 `python3` :
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Fusionnez [`hooks/settings.example.json`](../../hooks/settings.example.json) dans
@@ -64,53 +79,30 @@ pour tous. La barrière lit une charge JSON de Stop hook sur stdin et répond pa
 un code de sortie, donc tout ce qui peut lancer un script en fin de tour peut la
 piloter.
 
-Ensuite, écrivez le fichier qui compte :
+`prove-it doctor` répond à la question de savoir si la barrière se déclencherait
+dans le dépôt où vous vous trouvez, et vous dit ce qui l'en empêche si ce n'est
+pas le cas :
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Tant que ce fichier n'existe pas, la barrière ne fait absolument rien.
+## Faire grandir la barrière
 
-## Vos cinq premières minutes
+Chaque vérification que vous ajoutez est une phrase dans votre réponse à la
+question de ce que "prouvé" signifie dans ce dépôt. Ajoutez la commande de test
+que vous lancez vraiment, puis le vérificateur de types, puis tout ce que vos
+revues attrapent régulièrement. Arrêtez-vous quand le script complet prend
+environ une minute ; les vérifications lentes ont leur place dans la CI.
 
-Commencez plus petit que vous ne le voudriez. Un `verify.sh` qui ne lance que
-`git diff --check` vaut déjà la peine, et il passe, ce qui vous montre que la
-barrière reste silencieuse quand le dépôt est en bon état.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Maintenant, faites-le échouer exprès :
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Demandez à l'agent de modifier n'importe quel fichier, puis laissez-le finir. Il
-va tenter de terminer son tour, la barrière va lancer `verify.sh`, et le tour
-restera ouvert. Retirez le `exit 1` et le même agent passe sans encombre. Ne
-livrez jamais une vérification que vous n'avez pas vue échouer.
-
-À partir de là, ajoutez une vraie vérification à la fois : la commande de test
-que vous lancez vraiment, puis le vérificateur de types, puis l'hygiène du diff.
-Chaque vérification ajoutée est une phrase dans votre réponse à la question de ce
-que "prouvé" signifie dans ce dépôt. Arrêtez-vous quand le script complet prend
-environ une minute.
+Lancez chaque vérification à la main avant de l'activer. Ne livrez jamais non
+plus une vérification que vous n'avez pas vue échouer : une vérification qui ne
+peut pas échouer n'est pas une vérification, et vous ne le découvrirez pas le
+jour où vous en aurez besoin.
 
 L'erreur courante est d'écrire un `verify.sh` ambitieux dès le premier jour. Une
 barrière lente ou instable se fait contourner en une semaine, et une barrière
@@ -199,7 +191,7 @@ qui s'est avéré vrai. Le fichier est écrit sur le disque local avec le mode
 `0600`, rien ne le transmet où que ce soit, et il reste désactivé jusqu'à ce que
 vous l'activiez. Après un mois d'entrées, vous pouvez arrêter de deviner comment
 votre agent échoue et le lire à la place. `/prove-it:ledger` en fait un résumé
-pour vous.
+pour vous, tout comme `prove-it ledger` en ligne de commande.
 
 ## Ce dépôt se met lui-même sous barrière
 

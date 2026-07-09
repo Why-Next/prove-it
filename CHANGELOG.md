@@ -26,6 +26,14 @@ one deliberate limitation stated in plain sight.
   `/prove-it:init` writes a first `verify.sh` and makes the user watch it fail
   once. `/prove-it:ledger` reads back what the gate has caught. The hooks are
   plain bash and remain usable without the plugin.
+- **`bin/prove-it`**, a dependency-free CLI behind those commands. `init`
+  detects the stack and scaffolds a gate that passes on the day it is written,
+  with the stack's own checks commented out until you have watched each pass.
+  `doctor` says whether the gate would fire here and what is stopping it.
+  `ledger` summarises what the gate has caught.
+- **A SessionStart notice.** Installing the plugin arms nothing on its own, so
+  the plugin says once per session whether this repository has a gate. A silent
+  inert gate is worse than none: you would believe you were covered.
 - **The ledger** (`PROVE_IT_LEDGER=1`). One JSON line per caught false
   completion, holding what the agent claimed, what was demanded, and what was
   true. Local disk only, never transmitted, off by default.

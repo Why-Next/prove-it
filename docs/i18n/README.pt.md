@@ -37,23 +37,36 @@ outra forma, teriam terminado com a palavra "pronto".
 
 ## Instalação
 
-Como um plugin do Claude Code:
+Três linhas, e a terceira faz o trabalho:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-O plugin registra dois hooks, um para marcar que uma sessão editou arquivos e
-outro para aplicar o portão ao turno, e adiciona dois comandos: `/prove-it:init`
-escreve o seu primeiro `verify.sh`, e `/prove-it:ledger` lê de volta o que o
-portão flagrou.
+O `/prove-it:init` detecta a sua stack, escreve um `verify.sh`, roda-o para que
+você o veja passar, depois roda uma cópia com `exit 1` acrescentado para que você
+veja o portão recusar um turno. Leva cerca de trinta segundos e nunca sobrescreve
+um `verify.sh` que você já tenha.
 
-Para qualquer outro agente, clone o repositório e conecte os mesmos dois hooks.
-Eles são bash puro e precisam apenas de `bash`, `git` e `python3`:
+O portão gerado tem exatamente uma verificação ativa, `git diff --check`, com as
+verificações para a sua stack escritas como comentários. Ele passa no dia em que
+você o instala, deliberadamente. Um portão que falha na `main` no dia em que
+chega ensina as pessoas a contorná-lo na primeira semana. Ligue as verificações
+comentadas uma de cada vez, depois de ter visto cada uma passar à mão.
+
+Nada mais é configurado, e nada roda até um `verify.sh` existir. Se você abre um
+repositório que não tem nenhum, o plugin avisa isso no início da sessão em vez de
+ficar quieto e deixar você supor que está coberto.
+
+## Sem o plugin
+
+Os hooks são bash puro e precisam apenas de `bash`, `git` e `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Mescle [`hooks/settings.example.json`](../../hooks/settings.example.json) no seu
@@ -62,53 +75,28 @@ todos eles. O portão lê um payload JSON do Stop hook no stdin e responde com u
 código de saída, então qualquer coisa capaz de rodar um script no fim do turno
 consegue acioná-lo.
 
-Depois escreva o arquivo que importa:
+O `prove-it doctor` responde se o portão dispararia no repositório em que você
+está, e diz o que o está impedindo caso não dispare:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Até esse arquivo existir, o portão não faz absolutamente nada.
+## Fazendo o portão crescer
 
-## Seus primeiros cinco minutos
-
-Comece menor do que você gostaria. Um `verify.sh` que roda apenas
-`git diff --check` já vale a pena ter, e ele passa, o que mostra que o portão
-fica quieto quando o repositório está em bom estado.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Agora faça-o falhar de propósito:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Peça ao agente para editar qualquer arquivo e deixe-o terminar. Ele vai tentar
-encerrar o turno, o portão vai rodar `verify.sh`, e o turno vai continuar aberto.
-Remova o `exit 1` e o mesmo agente passa sem obstáculos. Nunca publique uma
-verificação que você não viu falhar.
-
-A partir daí, adicione uma verificação real de cada vez: o comando de teste que
-você realmente roda, depois o verificador de tipos, depois a higiene de diff.
 Cada verificação que você adiciona é uma frase na sua resposta à pergunta do que
-"provado" significa neste repositório. Pare quando o script inteiro levar cerca
-de um minuto.
+"provado" significa neste repositório. Adicione o comando de teste que você
+realmente roda, depois o verificador de tipos, depois o que quer que as suas
+revisões sempre peguem. Pare quando o script inteiro levar cerca de um minuto;
+verificações lentas pertencem ao CI.
+
+Rode cada verificação à mão antes de ligá-la. Nunca publique também uma
+verificação que você não viu falhar: uma verificação que não consegue falhar não
+é uma verificação, e você não vai descobrir isso no dia em que precisar dela.
 
 O erro comum é escrever um `verify.sh` ambicioso no primeiro dia. Um portão lento
 ou instável é contornado em uma semana, e um portão contornado é pior do que
@@ -194,7 +182,8 @@ A linha registra o que o agente afirmou, o que foi exigido dele, e o que acabou
 sendo verdade. O arquivo é escrito no disco local com o modo `0600`, nada o
 transmite para lugar nenhum, e ele fica desligado até você ligar. Depois de um
 mês de entradas, você pode parar de adivinhar como o seu agente falha e ler isso
-em vez disso. O `/prove-it:ledger` resume o arquivo para você.
+em vez disso. O `/prove-it:ledger` resume o arquivo para você, assim como
+`prove-it ledger` na linha de comando.
 
 ## Este repositório aplica o portão a si mesmo
 

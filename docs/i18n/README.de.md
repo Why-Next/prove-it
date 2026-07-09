@@ -38,23 +38,39 @@ fertig zu sein. Diese Züge hätten sonst mit dem Wort "fertig" geendet.
 
 ## Installation
 
-Als Claude Code Plugin:
+Drei Zeilen, und die dritte erledigt die Arbeit:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-Das Plugin registriert zwei Hooks - einen, der markiert, dass eine Sitzung
-Dateien bearbeitet hat, und einen, der den Zug gated - und fügt zwei Kommandos
-hinzu: `/prove-it:init` schreibt dein erstes `verify.sh`, und
-`/prove-it:ledger` liest zurück, was das Gate erwischt hat.
+`/prove-it:init` erkennt deinen Stack, schreibt ein `verify.sh`, führt es aus,
+damit du siehst, wie es besteht, und führt dann eine Kopie mit angehängtem
+`exit 1` aus, damit du siehst, wie das Gate einen Zug verweigert. Das dauert
+etwa dreißig Sekunden, und es überschreibt nie ein `verify.sh`, das du bereits
+hast.
 
-Für jeden anderen Agenten klone das Repository und verdrahte dieselben zwei
-Hooks. Sie sind reines bash und brauchen nur `bash`, `git` und `python3`:
+Das erzeugte Gate hat genau einen aktiven Check, `git diff --check`, wobei die
+Checks für deinen Stack als Kommentare hineingeschrieben sind. Es besteht an dem
+Tag, an dem du es installierst, mit Absicht. Ein Gate, das an dem Tag, an dem es
+landet, auf `main` fehlschlägt, bringt Leuten bei, es in der ersten Woche zu
+umgehen. Schalte die auskommentierten Checks einen nach dem anderen an, nachdem
+du jeden von Hand hast bestehen sehen.
+
+Sonst ist nichts konfiguriert, und nichts läuft, bis ein `verify.sh` existiert.
+Wenn du ein Repository öffnest, das keines hat, sagt das Plugin das zu Beginn
+der Sitzung, statt still zu bleiben und dich annehmen zu lassen, du seist
+abgesichert.
+
+## Ohne das Plugin
+
+Die Hooks sind reines bash und brauchen nur `bash`, `git` und `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Füge [`hooks/settings.example.json`](../../hooks/settings.example.json) in deine
@@ -63,53 +79,29 @@ Füge [`hooks/settings.example.json`](../../hooks/settings.example.json) in dein
 von stdin und antwortet mit einem Exit-Code, sodass alles, was am Ende eines
 Zuges ein Skript ausführen kann, es antreiben kann.
 
-Dann schreib die Datei, auf die es ankommt:
+`prove-it doctor` beantwortet, ob das Gate in dem Repository, in dem du stehst,
+auslösen würde, und sagt dir, was es aufhält, falls nicht:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Solange diese Datei nicht existiert, tut das Gate gar nichts.
+## Das Gate wachsen lassen
 
-## Deine ersten fünf Minuten
+Jeder Check, den du hinzufügst, ist ein Satz in deiner Antwort auf die Frage,
+was "bewiesen" in diesem Repository bedeutet. Füge das Test-Kommando hinzu, das
+du wirklich ausführst, dann den Typ-Checker, dann was auch immer deine Reviews
+immer wieder erwischen. Hör auf, wenn das ganze Skript etwa eine Minute dauert;
+langsame Checks gehören in CI.
 
-Fang kleiner an, als du möchtest. Ein `verify.sh`, das nur `git diff --check`
-ausführt, ist es schon wert, und es besteht, was dir zeigt, dass das Gate still
-bleibt, wenn das Repository in gutem Zustand ist.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Jetzt lass es absichtlich fehlschlagen:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Bitte den Agenten, irgendeine Datei zu bearbeiten, und lass ihn fertig werden.
-Er wird versuchen, den Zug zu beenden, das Gate wird `verify.sh` ausführen, und
-der Zug bleibt offen. Entfern das `exit 1`, und derselbe Agent kommt problemlos
-durch. Liefere nie einen Check aus, den du nicht hast fehlschlagen sehen.
-
-Von da an füge einen echten Check nach dem anderen hinzu: das Test-Kommando, das
-du wirklich ausführst, dann den Typ-Checker, dann die Diff-Hygiene. Jeder Check,
-den du hinzufügst, ist ein Satz in deiner Antwort auf die Frage, was "bewiesen"
-in diesem Repository bedeutet. Hör auf, wenn das ganze Skript etwa eine Minute
-dauert.
+Führ jeden Check von Hand aus, bevor du ihn anschaltest. Liefere auch nie einen
+Check aus, den du nicht hast fehlschlagen sehen: ein Check, der nicht
+fehlschlagen kann, ist kein Check, und das wirst du nicht an dem Tag
+herausfinden, an dem du ihn brauchst.
 
 Der häufige Fehler ist, am ersten Tag ein ehrgeiziges `verify.sh` zu schreiben.
 Ein Gate, das langsam oder flackerig ist, wird binnen einer Woche umgangen, und
@@ -199,7 +191,8 @@ und was sich als wahr herausstellte. Die Datei wird mit Modus `0600` auf die
 lokale Festplatte geschrieben, nichts überträgt sie irgendwohin, und sie bleibt
 aus, bis du sie einschaltest. Nach einem Monat an Einträgen kannst du aufhören
 zu raten, wie dein Agent scheitert, und es stattdessen nachlesen.
-`/prove-it:ledger` fasst die Datei für dich zusammen.
+`/prove-it:ledger` fasst die Datei für dich zusammen, ebenso wie
+`prove-it ledger` auf der Kommandozeile.
 
 ## Dieses Repo gated sich selbst
 

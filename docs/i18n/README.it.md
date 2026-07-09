@@ -38,23 +38,37 @@ altrimenti finiti con la parola "fatto".
 
 ## Installazione
 
-Come plugin di Claude Code:
+Tre righe, e la terza fa il lavoro:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-Il plugin registra due hook, uno per segnalare che una sessione ha modificato
-file e uno per applicare il gate al turno, e aggiunge due comandi:
-`/prove-it:init` scrive il tuo primo `verify.sh`, e `/prove-it:ledger` rilegge
-ciò che il gate ha intercettato.
+`/prove-it:init` rileva il tuo stack, scrive un `verify.sh`, lo esegue così lo
+vedi passare, poi esegue una copia con `exit 1` aggiunto in coda così vedi il
+gate rifiutare un turno. Impiega circa trenta secondi e non sovrascrive mai un
+`verify.sh` che hai già.
 
-Per qualsiasi altro agente, clona il repository e collega gli stessi due hook.
-Sono semplice bash e richiedono solo `bash`, `git` e `python3`:
+Il gate generato ha esattamente un controllo attivo, `git diff --check`, con i
+controlli per il tuo stack scritti come commenti. Passa il giorno in cui lo
+installi, di proposito. Un gate che fallisce su `main` il giorno in cui arriva
+insegna alle persone ad aggirarlo nella prima settimana. Attiva i controlli
+commentati uno alla volta, dopo aver visto ciascuno passare a mano.
+
+Nient'altro è configurato, e nulla viene eseguito finché non esiste un
+`verify.sh`. Se apri un repository che non ne ha uno, il plugin lo dice
+all'inizio della sessione anziché restare in silenzio e lasciarti supporre di
+essere coperto.
+
+## Senza il plugin
+
+Gli hook sono semplice bash e richiedono solo `bash`, `git` e `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Unisci [`hooks/settings.example.json`](../../hooks/settings.example.json) al tuo
@@ -63,53 +77,28 @@ Unisci [`hooks/settings.example.json`](../../hooks/settings.example.json) al tuo
 hook su stdin e risponde con un codice di uscita, quindi qualsiasi cosa possa
 eseguire uno script a fine turno può pilotarlo.
 
-Poi scrivi il file che conta:
+`prove-it doctor` risponde se il gate scatterebbe nel repository in cui ti trovi,
+e ti dice cosa lo blocca se non lo farebbe:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Finché quel file non esiste, il gate non fa assolutamente nulla.
+## Far crescere il gate
 
-## I tuoi primi cinque minuti
+Ogni controllo che aggiungi è una frase nella tua risposta alla domanda su cosa
+significhi "dimostrato" in questo repository. Aggiungi il comando di test che
+esegui davvero, poi il controllo dei tipi, poi qualsiasi cosa le tue revisioni
+continuino a intercettare. Fermati quando l'intero script impiega circa un
+minuto; i controlli lenti stanno in CI.
 
-Comincia con qualcosa di più piccolo di quanto vorresti. Un `verify.sh` che
-esegue solo `git diff --check` vale la pena di averlo, e passa, il che ti mostra
-che il gate resta silenzioso quando il repository è in buono stato.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Ora fallo fallire di proposito:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Chiedi all'agente di modificare un file qualsiasi e lascialo finire. Proverà a
-terminare il turno, il gate eseguirà `verify.sh`, e il turno resterà aperto.
-Togli l'`exit 1` e lo stesso agente passa senza problemi. Non rilasciare mai un
-controllo che non hai visto fallire.
-
-Da lì, aggiungi un controllo reale alla volta: il comando di test che esegui
-davvero, poi il controllo dei tipi, poi l'igiene del diff. Ogni controllo che
-aggiungi è una frase nella tua risposta alla domanda su cosa significhi
-"dimostrato" in questo repository. Fermati quando l'intero script impiega circa
-un minuto.
+Esegui ogni controllo a mano prima di attivarlo. E non rilasciare mai un
+controllo che non hai visto fallire: un controllo che non può fallire non è un
+controllo, e non lo scoprirai il giorno in cui ne hai bisogno.
 
 L'errore comune è scrivere un `verify.sh` ambizioso il primo giorno. Un gate
 lento o instabile viene aggirato nel giro di una settimana, e un gate aggirato è
@@ -197,7 +186,8 @@ La riga registra ciò che l'agente ha affermato, ciò che gli è stato richiesto
 ciò che si è rivelato vero. Il file è scritto su disco locale con permessi
 `0600`, nulla lo trasmette da nessuna parte, e resta disattivato finché non lo
 attivi. Dopo un mese di voci puoi smettere di tirare a indovinare su come
-fallisce il tuo agente e leggerlo invece. `/prove-it:ledger` ti riassume il file.
+fallisce il tuo agente e leggerlo invece. `/prove-it:ledger` ti riassume il file,
+così come `prove-it ledger` da riga di comando.
 
 ## Questo repo applica il gate a se stesso
 

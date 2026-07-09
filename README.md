@@ -36,22 +36,36 @@ ended with the word "done."
 
 ## Install
 
-As a Claude Code plugin:
+Three lines, and the third one does the work:
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-The plugin registers two hooks, one to mark that a session edited files and one
-to gate the turn, and adds two commands: `/prove-it:init` writes your first
-`verify.sh`, and `/prove-it:ledger` reads back what the gate has caught.
+`/prove-it:init` detects your stack, writes a `verify.sh`, runs it so you watch
+it pass, then runs a copy with `exit 1` appended so you watch the gate refuse a
+turn. It takes about thirty seconds and it never overwrites a `verify.sh` you
+already have.
 
-For any other agent, clone the repository and wire the same two hooks. They are
-plain bash and need only `bash`, `git`, and `python3`:
+The generated gate has exactly one active check, `git diff --check`, with the
+checks for your stack written in as comments. It passes on the day you install
+it, deliberately. A gate that fails on `main` the day it lands teaches people to
+bypass it in the first week. Switch the commented checks on one at a time, after
+you have watched each one pass by hand.
+
+Nothing else is configured, and nothing runs until a `verify.sh` exists. If you
+open a repository that has none, the plugin says so at the start of the session
+rather than staying quiet and letting you assume you are covered.
+
+## Without the plugin
+
+The hooks are plain bash and need only `bash`, `git`, and `python3`:
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 Merge [`hooks/settings.example.json`](hooks/settings.example.json) into your
@@ -59,51 +73,27 @@ Merge [`hooks/settings.example.json`](hooks/settings.example.json) into your
 of them. The gate reads a Stop-hook JSON payload on stdin and answers with an
 exit code, so anything that can run a script at end of turn can drive it.
 
-Then write the file that matters:
+`prove-it doctor` answers whether the gate would fire in the repository you are
+standing in, and tells you what is stopping it if it would not:
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-Until that file exists, the gate does nothing at all.
+## Growing the gate
 
-## Your first five minutes
+Each check you add is a sentence in your answer to the question of what "proven"
+means in this repository. Add the test command you actually run, then the type
+checker, then whatever your reviews keep catching. Stop when the whole script
+takes about a minute; slow checks belong in CI.
 
-Start smaller than you want to. A `verify.sh` that runs only `git diff --check`
-is worth having, and it passes, which shows you the gate stays quiet when the
-repository is in good shape.
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-Now make it fail on purpose:
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-Ask the agent to edit any file and let it finish. It will try to end the turn,
-the gate will run `verify.sh`, and the turn will stay open. Remove the `exit 1`
-and the same agent sails through. Never ship a check you have not watched fail.
-
-From there, add one real check at a time: the test command you actually run, then
-the type checker, then the diff hygiene. Each check you add is a sentence in your
-answer to the question of what "proven" means in this repository. Stop when the
-whole script takes about a minute.
+Run every check by hand before you switch it on. Never ship a check you have not
+watched fail, either: a check that cannot fail is not a check, and you will not
+find that out on the day you need it.
 
 The common mistake is writing an ambitious `verify.sh` on the first day. A gate
 that is slow or flaky gets bypassed within a week, and a bypassed gate is worse
@@ -186,7 +176,8 @@ The line records what the agent claimed, what was demanded of it, and what turne
 out to be true. The file is written to local disk with mode `0600`, nothing
 transmits it anywhere, and it stays off until you turn it on. After a month of
 entries you can stop guessing about how your agent fails and read it instead.
-`/prove-it:ledger` summarises the file for you.
+`/prove-it:ledger` summarises the file for you, as does `prove-it ledger` on the
+command line.
 
 ## This repo gates itself
 

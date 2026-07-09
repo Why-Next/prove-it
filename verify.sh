@@ -8,13 +8,13 @@ set -eu
 cd "$(dirname "$0")"
 
 # Command output: every shell script parses.
-for f in hooks/*.sh recipes/*.sh tests/*.sh verify.sh; do
+for f in hooks/*.sh recipes/*.sh tests/*.sh bin/prove-it verify.sh; do
     bash -n "$f"
 done
 
 # Cross-check: shellcheck is an independent source from bash's own parser.
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -S warning hooks/*.sh verify.sh tests/*.sh
+    shellcheck -S warning hooks/*.sh bin/prove-it verify.sh tests/*.sh
 else
     echo "verify.sh: shellcheck not installed, skipping static analysis"
 fi
@@ -51,6 +51,9 @@ python3 scripts/check_i18n.py
 
 # Reproduction: the gate blocks a failing repo and allows a passing one.
 bash tests/test_gate.sh
+
+# Reproduction: a fresh install produces a working gate without hand-editing.
+bash tests/test_cli.sh
 
 # Diff hygiene.
 git diff --check

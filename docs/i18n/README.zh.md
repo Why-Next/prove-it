@@ -29,61 +29,46 @@
 
 ## 安装
 
-作为 Claude Code 插件：
+三行命令，真正干活的是第三行：
 
 ```
 /plugin marketplace add WhyNext/prove-it
 /plugin install prove-it@whynext
+/prove-it:init
 ```
 
-插件会注册两个 hook，一个用来标记某次会话编辑过文件，另一个用来对回合设卡，还会加上两个命令：`/prove-it:init` 会写出你的第一个 `verify.sh`，`/prove-it:ledger` 会回读门禁抓到过什么。
+`/prove-it:init` 会检测你的技术栈，写出一个 `verify.sh`，运行它好让你亲眼看着它通过，然后再运行一份在末尾加了 `exit 1` 的副本，好让你看着门禁拒绝一个回合。这大约要三十秒，而且它绝不会覆盖你已经有的 `verify.sh`。
 
-对于任何其他智能体，克隆仓库并接上这两个相同的 hook。它们就是普通的 bash 脚本，只需要 `bash`、`git` 和 `python3`：
+生成出来的门禁只有一项处于激活状态的检查，`git diff --check`，针对你技术栈的那些检查则作为注释写在里面。它在你安装它的当天会通过，这是刻意的。一个在落地当天就在 `main` 上失败的门禁，会教人在头一周里就把它绕过去。把注释掉的检查一次打开一项，在你亲手看着每一项通过之后再打开。
+
+除此之外没有别的配置，而且在一个 `verify.sh` 存在之前什么都不会运行。如果你打开一个没有它的仓库，插件会在会话一开始就把这件事说出来，而不是保持沉默、任由你以为自己已经受到保护。
+
+## 不使用插件
+
+这些 hook 就是普通的 bash 脚本，只需要 `bash`、`git` 和 `python3`：
 
 ```bash
 git clone https://github.com/WhyNext/prove-it ~/.local/share/prove-it
+~/.local/share/prove-it/bin/prove-it init
 ```
 
 把 [`hooks/settings.example.json`](../../hooks/settings.example.json) 合并进你的 `.claude/settings.json`（针对单个仓库），或者 `~/.claude/settings.json`（对所有仓库）。门禁从 stdin 读取 Stop hook 的 JSON 负载，并用退出码作答，所以任何能在回合结束时运行脚本的东西都能驱动它。
 
-然后写下那个真正重要的文件：
+`prove-it doctor` 会回答：在你此刻所在的仓库里，门禁会不会触发；如果不会，它会告诉你是什么在拦着它：
 
-```bash
-cat > verify.sh <<'EOF'
-#!/bin/bash
-set -eu
-cd "$(dirname "$0")"
-
-npm test
-npx tsc --noEmit
-git diff --check
-
-echo "verify.sh OK"
-EOF
-chmod +x verify.sh
+```
+repository   /home/you/src/api
+verify.sh    present and executable
+working tree dirty, so the gate would run on the next stop
+state        /home/you/.local/state/prove-it
+ledger       off (export PROVE_IT_LEDGER=1 to record what the gate catches)
 ```
 
-在那个文件存在之前，门禁什么都不做。
+## 让门禁生长
 
-## 你的头五分钟
+你每加一个检查，都是在回答"在这个仓库里'被证明'意味着什么"这个问题时补上的一句话。加上你实际运行的测试命令，然后是类型检查器，再然后是你的评审反复抓到的那些东西。当整个脚本大约要跑一分钟时就停下；慢的检查该放到 CI 里。
 
-从比你想要的更小的地方开始。一个只运行 `git diff --check` 的 `verify.sh` 就值得拥有，而且它会通过，这会让你看到：当仓库状态良好时，门禁保持安静。
-
-```bash
-printf '#!/bin/bash\nset -eu\ncd "$(dirname "$0")"\ngit diff --check\n' > verify.sh
-chmod +x verify.sh
-./verify.sh                 # run it yourself first
-```
-
-现在故意让它失败：
-
-```bash
-sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify.sh.bak
-```
-
-让智能体编辑任意一个文件，然后让它收尾。它会试图结束这一回合，门禁会运行 `verify.sh`，而这一回合会一直开着。撤掉那个 `exit 1`，同一个智能体就会顺畅通过。绝不要交付一个你没有亲眼看着它失败的检查。
-
-从这里开始，一次加一个真正的检查：你实际运行的测试命令，然后是类型检查器，然后是 diff 卫生检查。你每加一个检查，都是在回答"在这个仓库里'被证明'意味着什么"这个问题时补上的一句话。当整个脚本大约要跑一分钟时，就停下。
+在你打开每一项检查之前，先亲手运行它。同样地，绝不要交付一个你没有亲眼看着它失败的检查：一个不可能失败的检查不算检查，而你不会在需要它的那一天才发现这一点。
 
 常见的错误是第一天就写一个雄心勃勃的 `verify.sh`。又慢又不稳定的门禁会在一周之内被绕过，而被绕过的门禁比没有门禁更糟，因为它会报告有一个检查运行过，其实什么都没运行。
 
@@ -138,7 +123,7 @@ sed -i.bak 's|git diff --check|git diff --check\nexit 1|' verify.sh && rm verify
  "evidence_demanded":"verify.sh exit 0","actual":["3 failed, 41 passed"]}
 ```
 
-这一行记录了智能体声称了什么、被要求了什么，以及最后被证明为真的是什么。这个文件以 `0600` 权限写入本地磁盘，不会被传输到任何地方，而且在你打开它之前一直是关闭的。积累一个月的条目之后，你就不用再猜你的智能体是怎么失败的，而是直接去读它。`/prove-it:ledger` 会替你把这个文件汇总起来。
+这一行记录了智能体声称了什么、被要求了什么，以及最后被证明为真的是什么。这个文件以 `0600` 权限写入本地磁盘，不会被传输到任何地方，而且在你打开它之前一直是关闭的。积累一个月的条目之后，你就不用再猜你的智能体是怎么失败的，而是直接去读它。`/prove-it:ledger` 会替你把这个文件汇总起来，命令行上的 `prove-it ledger` 也一样。
 
 ## 这个仓库对自己设卡
 

@@ -1,6 +1,16 @@
 {
-  "//": "Claude Code hook wiring for prove-it. Merge into .claude/settings.json in your repo, or ~/.claude/settings.json for every repo. Replace /path/to/prove-it with where you cloned it.",
+  "//": "Claude Code hook wiring for prove-it, for people who would rather not install the plugin. Merge into .claude/settings.json in your repo, or ~/.claude/settings.json for every repo. Replace /path/to/prove-it with where you cloned it.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /path/to/prove-it/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write|NotebookEdit",
