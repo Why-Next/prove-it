@@ -221,7 +221,10 @@ for row in rows[-5:]:
 print("\nwhat was actually wrong")
 for row in rows[-5:]:
     actual = row.get("actual") or []
-    print(f"  exit {row.get('exit_code', '?')}  {actual[-1] if actual else '(no output)'}")
+    first = actual[0].strip() if actual else "(no output)"
+    if len(first) > 78:
+        first = first[:78] + "..."
+    print(f"  exit {row.get('exit_code', '?')}  {first}")
 
 codes = collections.Counter(r.get("exit_code") for r in rows)
 if len(codes) == 1 and len(rows) > 3:

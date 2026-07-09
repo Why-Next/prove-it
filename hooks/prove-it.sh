@@ -115,13 +115,36 @@ def last_claim(path):
         text = text[:300] + '...'
     return text
 
+import re
+
+FAILURE = re.compile(
+    r'\b(fail|failed|failing|error|assert\w*|expected|actual|traceback|panic|'
+    r'exception|not ok|refute|mismatch)\b', re.I)
+
+def salient(output):
+    '''The lines that say what went wrong.
+
+    Keeping the tail is wrong. Test runners end with a summary line about how
+    many milliseconds they took, while the assertion that explains the failure
+    sits further up. Prefer lines that name a failure, and fall back to the
+    tail only when none of them do.
+
+    No double quote may appear anywhere in this block: the shell passes it to
+    python with -c inside a double-quoted string, and one quote here ends that
+    string and silently disables the ledger.
+    '''
+    lines = [l.rstrip() for l in output.strip().splitlines() if l.strip()]
+    hits = [l for l in lines if FAILURE.search(l)]
+    chosen = hits[:8] if hits else lines[-5:]
+    return [l[:200] for l in chosen]
+
 entry = {
     'ts': os.environ['TS'],
     'repo': os.environ['REPO'],
     'exit_code': int(os.environ['RC']),
     'claim': last_claim(os.environ.get('TRANSCRIPT', '')),
     'evidence_demanded': 'verify.sh exit 0',
-    'actual': os.environ['OUT'].strip().splitlines()[-5:],
+    'actual': salient(os.environ['OUT']),
 }
 
 # This file holds conversation text. Create it 0600 rather than inheriting a

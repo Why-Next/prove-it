@@ -36,7 +36,9 @@ one deliberate limitation stated in plain sight.
   inert gate is worse than none: you would believe you were covered.
 - **The ledger** (`PROVE_IT_LEDGER=1`). One JSON line per caught false
   completion, holding what the agent claimed, what was demanded, and what was
-  true. Local disk only, never transmitted, off by default.
+  true. It keeps the lines of output that name a failure rather than the tail,
+  because test runners end with a duration and begin the interesting part
+  further up. Local disk only, never transmitted, off by default.
 - **Recipes** for Node, Python, Go, and Flutter.
 - **Every document in eleven languages.** README, SPEC, CONTRIBUTING, SECURITY,
   and CODE_OF_CONDUCT, held to their English originals by

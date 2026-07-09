@@ -19,6 +19,11 @@ else
     echo "verify.sh: shellcheck not installed, skipping static analysis"
 fi
 
+# A double quote inside an embedded `python3 -c "..."` block ends the shell
+# string, and the error goes to /dev/null. Static check, because the symptom is
+# a feature that quietly stops working.
+python3 scripts/check_embedded_python.py
+
 # Every JSON file we ship has to parse, or the install silently fails.
 for f in hooks/settings.example.json hooks/hooks.json \
          .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
