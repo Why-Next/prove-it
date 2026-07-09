@@ -7,6 +7,8 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+CANONICAL_REPO = "github.com/Why-Next/prove-it"
+STALE_REPO = "github.com/WhyNext/prove-it"
 
 REQUIRED = [
     "README.md",
@@ -42,6 +44,20 @@ def main() -> int:
     pr = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
     if "./verify.sh" not in pr:
         errors.append("pull request template does not ask for ./verify.sh evidence")
+
+    for rel in (
+        "README.md",
+        "CHANGELOG.md",
+        ".github/ISSUE_TEMPLATE/config.yml",
+        ".claude-plugin/plugin.json",
+    ):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        if STALE_REPO in text:
+            errors.append(f"{rel} still points to the old repository URL")
+
+    plugin = (ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+    if CANONICAL_REPO not in plugin:
+        errors.append("plugin.json does not point to the canonical organization repo")
 
     if errors:
         for error in errors:

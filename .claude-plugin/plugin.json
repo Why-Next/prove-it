@@ -6,8 +6,8 @@
     "name": "Why-Next",
     "email": "hello@whynext.app"
   },
-  "homepage": "https://github.com/WhyNext/prove-it",
-  "repository": "https://github.com/WhyNext/prove-it",
+  "homepage": "https://github.com/Why-Next/prove-it",
+  "repository": "https://github.com/Why-Next/prove-it",
   "license": "MIT",
   "keywords": ["verification", "hooks", "guardrails", "evals", "ci"]
 }
