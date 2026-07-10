@@ -142,6 +142,13 @@ deve continuare a funzionare. Cancellarlo nel mezzo della sessione che stava per
 bloccare non è una rinuncia, e la differenza tra le due è visibile solo a
 un'implementazione che ha guardato prima.
 
+La forma più sottile tiene `verify.sh` eseguibile e ne riscrive i controlli.
+Questo non può essere rifiutato senza rifiutare anche il lavoro legittimo sul
+gate, quindi un'implementazione dovrebbe registrare cosa conteneva `verify.sh`
+quando la sessione è iniziata, e quando un turno passa attraverso un `verify.sh`
+cambiato durante la sessione, dirlo dove l'utente lo vedrà. Il passaggio resta
+valido; il silenzio no.
+
 ## 5. Livelli di conformità
 
 Sii preciso su cosa impone una macchina e cosa mette in pratica una persona.

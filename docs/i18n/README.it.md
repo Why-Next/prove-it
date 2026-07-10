@@ -56,6 +56,39 @@ attivo, poi attiva un comando reale solo dopo averlo visto passare a mano. Da
 quel momento, quando l'agente cambia il repository e prova a fermarsi,
 `verify.sh` decide se può restituire il lavoro.
 
+## Perché non cinque righe scritte da te?
+
+Uno Stop hook che esegue i tuoi test è questione di cinque righe di bash, è la
+prima versione di quasi tutti, e fallisce in quattro modi silenziosi. Alcuni di
+questi erano bug nelle prime versioni proprio di questo gate, ed è per questo
+che ognuno ora ha un test di regressione.
+
+- **Rimanda indietro una volta, poi mai più.** Claude Code imposta
+  `stop_hook_active` a ogni stop dopo il primo blocco. Un hook che legge quel
+  flag come "lascialo passare" blocca esattamente una volta e poi smette di
+  essere un gate, e uno che ignora il flag blocca per sempre e paralizza la
+  sessione. Questo gate conta i tentativi, rimanda indietro un numero limitato
+  di volte, e poi cede facendosi sentire.
+- **Dopo un commit sembra che non sia successo nulla.** Un hook che decide
+  controllando se l'albero di lavoro è sporco lascia passare qualsiasi turno
+  che finisce con un commit, e committare è la cosa più ordinaria che un agente
+  faccia. Questo gate confronta l'albero con una baseline registrata all'inizio
+  della sessione, quindi un commit, una riscrittura con `sed` e un file
+  generato contano tutti come modifiche.
+- **L'agente può rimuovere il controllo.** Un agente che non riesce a superare
+  `verify.sh` può invece cancellarlo o dargli un `chmod -x`. Questo gate
+  registra se il repository era armato quando la sessione è iniziata e rifiuta
+  un turno che finisce con il gate disarmato. Una riscrittura che lo mantiene
+  eseguibile viene lasciata passare, e ti viene segnalata anziché essere
+  creduta in silenzio.
+- **Cedere è indistinguibile dal passare.** Ogni host prima o poi costringe un
+  hook a cedere. Un hook fatto a mano cede in silenzio e l'ultima parola che
+  vedi è "fatto"; l'ultima parola di questo è un avviso che il turno è finito
+  non verificato.
+
+Se preferisci tenere il tuo hook, tienilo, e leggi [SPEC.md](../../SPEC.md) per
+i casi che deve coprire. La convenzione conta più di questa sua implementazione.
+
 ## Installazione
 
 Tre righe, e la terza fa il lavoro:
@@ -95,7 +128,11 @@ Unisci [`hooks/settings.example.json`](../../hooks/settings.example.json) al tuo
 `.claude/settings.json` per un singolo repository, oppure a
 `~/.claude/settings.json` per tutti. Il gate legge un payload JSON dello Stop
 hook su stdin e risponde con un codice di uscita, quindi qualsiasi cosa possa
-eseguire uno script a fine turno può pilotarlo.
+eseguire uno script a fine turno può pilotarlo. Claude Code è dove viene
+testato; [docs/ADAPTERS.md](../ADAPTERS.md) spiega come collegarlo a Codex CLI,
+Qwen Code, Gemini CLI e Copilot CLI, che espongono lo stesso tipo di hook
+bloccante di fine turno, e dice chiaramente quali host non possono affatto
+pilotare un gate.
 
 `prove-it doctor` risponde se il gate scatterebbe nel repository in cui ti trovi,
 e ti dice cosa lo blocca se non lo farebbe:
@@ -166,11 +203,13 @@ come rinunciare in modo onesto se era questo che intendeva. Cancellare
 `verify.sh` tra una sessione e l'altra resta una rinuncia e richiede ancora un
 solo comando.
 
-Ciò che resta non imposto è la versione sottile: un agente che tiene `verify.sh`
-eseguibile e ne svuota in silenzio i controlli. Il messaggio di errore gli dice
-di non farlo, e [SPEC.md](../../SPEC.md) lo definisce una violazione anziché una
-correzione, ma nessuna delle due cose è un'imposizione. Leggi i tuoi diff. È a
-questo che serve la prova per diff nella specifica.
+La versione sottile è un agente che tiene `verify.sh` eseguibile e ne riscrive i
+controlli. Quel passaggio non viene bloccato, perché modificare `verify.sh` è
+spesso esattamente il lavoro che hai chiesto, ma non è più nemmeno silenzioso:
+quando un turno passa attraverso un `verify.sh` cambiato durante la sessione, il
+gate te lo dice, e il diff a `verify.sh` ti dice se la modifica era lavoro o
+elusione. Leggi quel diff. È a questo che serve la prova per diff nella
+specifica.
 
 ## La convenzione `verify.sh`
 

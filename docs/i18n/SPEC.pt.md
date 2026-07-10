@@ -140,6 +140,13 @@ entre sessões é o opt-out da seção 2 e deve continuar funcionando. Apagá-lo
 meio da sessão que ele estava prestes a bloquear não é um opt-out, e a diferença
 entre os dois só é visível para uma implementação que olhou antes.
 
+A forma mais sutil mantém o `verify.sh` executável e reescreve as verificações
+dentro dele. Isso não pode ser recusado sem recusar também trabalho legítimo no
+portão, então uma implementação deveria registrar o que o `verify.sh` continha
+quando a sessão começou, e, quando um turno passa por um `verify.sh` que mudou
+durante a sessão, dizer isso onde o usuário vai ver. A passagem fica de pé; o
+silêncio, não.
+
 ## 5. Níveis de conformidade
 
 Seja preciso sobre o que uma máquina impõe e o que uma pessoa pratica. Essa

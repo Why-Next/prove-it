@@ -55,6 +55,39 @@ ativa, e então ligue um comando real depois de vê-lo passar manualmente. A par
 daí, quando o agente muda o repositório e tenta parar, o `verify.sh` decide se
 ele pode devolver o trabalho.
 
+## Por que não cinco linhas suas?
+
+Um Stop hook que roda os seus testes tem cinco linhas de bash, é a primeira
+versão da maioria das pessoas, e falha de quatro maneiras silenciosas. Várias
+delas foram bugs em versões iniciais deste mesmo portão, e é por isso que cada
+uma agora tem um teste de regressão.
+
+- **Ele empurra de volta uma vez, e nunca mais.** O Claude Code define
+  `stop_hook_active` em toda parada depois do primeiro bloqueio. Um hook que lê
+  essa flag como "deixe passar" bloqueia exatamente uma vez e então deixa de ser
+  um portão, e um que ignora a flag bloqueia para sempre e trava a sessão. Este
+  portão conta as tentativas, empurra de volta um número limitado de vezes, e
+  então cede em alto e bom som.
+- **Um commit parece que nada aconteceu.** Um hook que decide checando se a
+  árvore de trabalho está suja deixa passar qualquer turno que termina em um
+  commit, e commitar é a coisa mais comum que um agente faz. Este portão compara
+  a árvore com um baseline registrado no início da sessão, então um commit, uma
+  reescrita com `sed` e um arquivo gerado contam todos como mudanças.
+- **O agente pode remover a verificação.** Um agente que não consegue fazer o
+  `verify.sh` passar pode apagá-lo ou aplicar `chmod -x` nele em vez disso. Este
+  portão registra se o repositório estava armado quando a sessão começou e
+  recusa um turno que termina com o portão desarmado. Uma reescrita que o mantém
+  executável é deixada passar, e relatada a você em vez de silenciosamente
+  confiada.
+- **Desistir é indistinguível de passar.** Todo host acaba forçando um hook a
+  ceder. Um hook feito à mão cede em silêncio e a última palavra que você vê é
+  "pronto"; a última palavra deste é um aviso de que o turno terminou sem
+  verificação.
+
+Se você prefere manter o seu próprio hook, mantenha-o, e leia o
+[SPEC.md](../../SPEC.md) para os casos que ele tem que cobrir. A convenção
+importa mais do que esta implementação dela.
+
 ## Instalação
 
 Três linhas, e a terceira faz o trabalho:
@@ -93,7 +126,11 @@ Mescle [`hooks/settings.example.json`](../../hooks/settings.example.json) no seu
 `.claude/settings.json` para um repositório, ou `~/.claude/settings.json` para
 todos eles. O portão lê um payload JSON do Stop hook no stdin e responde com um
 código de saída, então qualquer coisa capaz de rodar um script no fim do turno
-consegue acioná-lo.
+consegue acioná-lo. O Claude Code é onde ele é testado; o
+[docs/ADAPTERS.md](../ADAPTERS.md) traz a fiação para o Codex CLI, o Qwen Code,
+o Gemini CLI e o Copilot CLI, que expõem o mesmo tipo de hook bloqueante de fim
+de turno, e diz com todas as letras quais hosts não conseguem acionar um portão
+de jeito nenhum.
 
 O `prove-it doctor` responde se o portão dispararia no repositório em que você
 está, e diz o que o está impedindo caso não dispare:
@@ -162,11 +199,13 @@ bloqueada, informada do que fez, e informada de como optar por sair honestamente
 se era isso que ela queria. Apagar o `verify.sh` entre sessões ainda é uma saída
 e ainda leva um comando.
 
-O que continua sem imposição é a versão sutil: um agente que mantém o `verify.sh`
-executável e silenciosamente esvazia as verificações dentro dele. A mensagem de
-falha diz para não fazer isso, e o [SPEC.md](../../SPEC.md) chama isso de
-violação, não de correção, mas nenhuma das duas coisas é imposição. Leia os seus
-diffs. É para isso que serve a evidência de diff na spec.
+A versão sutil é um agente que mantém o `verify.sh` executável e reescreve as
+verificações dentro dele. Essa passagem não é bloqueada, porque editar o
+`verify.sh` é muitas vezes exatamente o trabalho que você pediu, mas ela também
+já não é silenciosa: quando um turno passa por um `verify.sh` que mudou durante
+a sessão, o portão diz isso a você, e o diff do `verify.sh` diz se a mudança foi
+trabalho ou evasão. Leia esse diff. É para isso que serve a evidência de diff na
+spec.
 
 ## A convenção do `verify.sh`
 

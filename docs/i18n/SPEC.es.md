@@ -136,6 +136,12 @@ sección 2 y debe seguir funcionando. Borrarlo en mitad de la sesión que estaba
 bloquear no es una renuncia, y la diferencia entre las dos solo es visible para una
 implementación que miró antes.
 
+La forma más sutil mantiene `verify.sh` ejecutable y reescribe las comprobaciones que hay
+dentro. Eso no puede rechazarse sin rechazar también el trabajo legítimo sobre la barrera,
+así que una implementación debería anotar qué contenía `verify.sh` cuando la sesión empezó,
+y cuando un turno pasa a través de un `verify.sh` que cambió durante la sesión, decirlo
+donde el usuario lo vea. El pase se mantiene; el silencio no.
+
 ## 5. Niveles de conformidad
 
 Sé preciso sobre lo que impone una máquina y lo que practica una persona. Esa distinción

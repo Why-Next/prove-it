@@ -57,6 +57,40 @@ aktiven Check, und schalte dann einen echten Befehl erst ein, nachdem du ihn von
 Hand hast bestehen sehen. Danach entscheidet `verify.sh`, ob der Agent die Arbeit
 zurückgeben darf, wenn er das Repository geändert hat und stoppen will.
 
+## Warum nicht fünf eigene Zeilen?
+
+Ein Stop-Hook, der deine Tests ausführt, ist fünf Zeilen bash, er ist die erste
+Version der meisten Leute, und er scheitert auf vier stille Arten. Mehrere davon
+waren Bugs in frühen Versionen genau dieses Gates, weshalb jede inzwischen einen
+Regressionstest hat.
+
+- **Er drängt einmal zurück und dann nie wieder.** Claude Code setzt
+  `stop_hook_active` bei jedem Stopp nach dem ersten Block. Ein Hook, der
+  dieses Flag als "durchlassen" liest, blockiert genau einmal und hört dann
+  auf, ein Gate zu sein, und einer, der das Flag ignoriert, blockiert ewig und
+  lässt die Sitzung hängen. Dieses Gate zählt Versuche, drängt eine begrenzte
+  Anzahl von Malen zurück und gibt dann laut nach.
+- **Ein Commit sieht aus, als wäre nichts passiert.** Ein Hook, der danach
+  entscheidet, ob der Arbeitsbaum schmutzig ist, winkt jeden Zug durch, der in
+  einem Commit endet, und Committen ist das Gewöhnlichste, was ein Agent tut.
+  Dieses Gate vergleicht den Baum mit einer zu Sitzungsbeginn festgehaltenen
+  Grundlinie, sodass ein Commit, eine Umschreibung per `sed` und eine
+  generierte Datei alle als Änderungen zählen.
+- **Der Agent kann den Check entfernen.** Ein Agent, der `verify.sh` nicht
+  bestehen kann, kann es stattdessen löschen oder mit `chmod -x` entwaffnen.
+  Dieses Gate hält fest, ob das Repository scharf geschaltet war, als die
+  Sitzung begann, und verweigert einen Zug, der mit entwaffnetem Gate endet.
+  Eine Umschreibung, die es ausführbar lässt, wird durchgelassen und dir
+  gemeldet, statt dass ihr still vertraut wird.
+- **Aufgeben ist von Bestehen nicht zu unterscheiden.** Jeder Host zwingt
+  einen Hook irgendwann zum Nachgeben. Ein handgeschriebener Hook gibt still
+  nach, und das letzte Wort, das du siehst, ist "fertig"; das letzte Wort
+  dieses Gates ist eine Warnung, dass der Zug unverifiziert endete.
+
+Wenn du lieber deinen eigenen Hook behältst, behalte ihn, und lies
+[SPEC.md](../../SPEC.md) für die Fälle, die er abdecken muss. Die Konvention
+zählt mehr als diese eine Umsetzung davon.
+
 ## Installation
 
 Drei Zeilen, und die dritte erledigt die Arbeit:
@@ -98,7 +132,11 @@ Füge [`hooks/settings.example.json`](../../hooks/settings.example.json) in dein
 `.claude/settings.json` für ein einzelnes Repository ein, oder in
 `~/.claude/settings.json` für alle. Das Gate liest eine Stop-hook-JSON-Nutzlast
 von stdin und antwortet mit einem Exit-Code, sodass alles, was am Ende eines
-Zuges ein Skript ausführen kann, es antreiben kann.
+Zuges ein Skript ausführen kann, es antreiben kann. Getestet wird es in Claude
+Code; [docs/ADAPTERS.md](../ADAPTERS.md) enthält die Verdrahtung für Codex CLI,
+Qwen Code, Gemini CLI und Copilot CLI, die dieselbe Art von blockierendem Hook
+am Ende des Zuges bereitstellen, und sagt schlicht, welche Hosts gar kein Gate
+antreiben können.
 
 `prove-it doctor` beantwortet, ob das Gate in dem Repository, in dem du stehst,
 auslösen würde, und sagt dir, was es aufhält, falls nicht:
@@ -170,11 +208,13 @@ hat, und ihr wird gesagt, wie man ehrlich aussteigt, falls das gemeint war.
 `verify.sh` zwischen Sitzungen zu löschen ist weiterhin ein Ausstieg und braucht
 weiterhin ein einziges Kommando.
 
-Was unerzwungen bleibt, ist die subtile Ausführung: ein Agent, der `verify.sh`
-ausführbar hält und die Checks darin still aushöhlt. Die Fehlermeldung sagt ihm,
-dass er das nicht tun soll, und [SPEC.md](../../SPEC.md) nennt es eine Verletzung
-statt einer Behebung, aber keines von beidem ist Durchsetzung. Lies deine Diffs.
-Genau dafür ist der Diff-Beweis in der Spec da.
+Die subtile Ausführung ist ein Agent, der `verify.sh` ausführbar hält und die
+Checks darin umschreibt. Dieses Bestehen wird nicht blockiert, denn `verify.sh`
+zu bearbeiten ist oft genau die Arbeit, um die du gebeten hast, aber still ist
+es auch nicht mehr: Wenn ein Zug durch ein `verify.sh` kommt, das sich während
+der Sitzung geändert hat, sagt das Gate dir das, und der Diff zu `verify.sh`
+sagt dir, ob die Änderung Arbeit oder Ausweichen war. Lies diesen Diff. Genau
+dafür ist der Diff-Beweis in der Spec da.
 
 ## Die `verify.sh`-Konvention
 

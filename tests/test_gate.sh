@@ -25,7 +25,8 @@ SHARED_TMP="${TMPDIR:-/tmp}"
 tmp_state() {
     find "$SHARED_TMP" -maxdepth 1 \
         \( -name 'prove-it*' -o -name 'stamp-*' -o -name 'wrote-*' \
-           -o -name 'baseline-*' -o -name 'guard-*' -o -name 'attempts-*' \) \
+           -o -name 'baseline-*' -o -name 'guard-*' -o -name 'attempts-*' \
+           -o -name 'gatehash-*' \) \
         2>/dev/null | sort
 }
 tmp_state > "$SANDBOX/tmp-before"
@@ -318,6 +319,42 @@ expect "without a baseline, an unmarked session is not gated" \
 mark_wrote s17 "$D"
 expect "without a baseline, a marked dirty session is gated" \
     2 "$(run_gate "$D" "$(payload s17 false)")"
+
+# --- rewriting verify.sh mid-session is surfaced, not blocked -----------------
+# The disarm check catches deletion and chmod -x. An agent can instead keep the
+# file executable and gut the checks inside it. The rewritten gate is still the
+# repository's gate, so a pass through it is allowed, but the user is told the
+# gate itself changed and that the pass is only as good as the new checks.
+D=$(new_repo rewrite); write_verify "$D" 1; commit_all "$D"
+start_session s20 "$D"; dirty "$D"
+write_verify "$D" 0                # the failing gate becomes a passing one
+OUT=$( cd "$D" && payload s20 false | bash "$GATE" 2>/dev/null ); RC=$?
+expect "a rewritten passing gate still lets the turn end" 0 "$RC"
+case "$OUT" in
+    *systemMessage*"modified during"*) ok "a rewritten gate warns the user" ;;
+    *) bad "a rewritten gate warns the user" "a systemMessage" "${OUT:-nothing}" ;;
+esac
+
+# A verify.sh that nobody touched must not trip that warning.
+D=$(new_repo untouched); write_verify "$D" 0; commit_all "$D"
+start_session s21 "$D"; dirty "$D"
+OUT=$( cd "$D" && payload s21 false | bash "$GATE" 2>/dev/null ); RC=$?
+expect "an untouched passing gate lets the turn end" 0 "$RC"
+case "$OUT" in
+    *systemMessage*) bad "an untouched gate stays quiet" "no systemMessage" "$OUT" ;;
+    *) ok "an untouched gate stays quiet" ;;
+esac
+
+# Creating verify.sh during the session is the install flow, not a rewrite.
+D=$(new_repo armlater)
+start_session s22 "$D"
+write_verify "$D" 0                # /prove-it:init happens mid-session
+OUT=$( cd "$D" && payload s22 false | bash "$GATE" 2>/dev/null ); RC=$?
+expect "a gate created mid-session lets a passing turn end" 0 "$RC"
+case "$OUT" in
+    *systemMessage*) bad "a gate created mid-session stays quiet" "no systemMessage" "$OUT" ;;
+    *) ok "a gate created mid-session stays quiet" ;;
+esac
 
 # --- state never lands in shared /tmp ----------------------------------------
 # A predictable name in a world-writable directory is a symlink target. Compare

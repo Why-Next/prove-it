@@ -8,6 +8,41 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0]
+
+### Added
+
+- **A rewritten gate is reported, not silently trusted.** The disarm check
+  catches a `verify.sh` that is deleted or `chmod -x`'d mid-session. The subtler
+  move keeps it executable and rewrites the checks inside it, and that pass
+  cannot be blocked without also blocking legitimate work on the gate. The
+  session hook now records what `verify.sh` contained at session start, and a
+  turn that passes through a `verify.sh` that changed during the session ends
+  with a warning telling the user to read the diff to `verify.sh`.
+- **README: "Why not five lines of your own?"** The comparison a first-time
+  reader actually needs: the four quiet ways a hand-rolled Stop hook fails
+  (one push-back then nothing, a commit that looks like a clean tree, a gate
+  the agent can remove, yielding that looks like passing) and what this gate
+  does about each.
+- **[docs/ADAPTERS.md](docs/ADAPTERS.md): the gate on other hosts.** Codex CLI
+  and Qwen Code expose the same Stop-hook contract as Claude Code, Gemini CLI
+  blocks through `AfterAgent`, and Copilot CLI needs a ten-line wrapper; each
+  gets its wiring, marked tested or not. Cursor CLI and OpenCode cannot
+  currently refuse a turn, and the page says so instead of shipping an adapter
+  that only pretends to gate.
+
+### Changed
+
+- [SPEC.md](SPEC.md) section 4: an implementation should record what
+  `verify.sh` contained at session start and surface a pass through a
+  `verify.sh` that changed mid-session. The pass stands; the silence does not.
+
+### Security
+
+- `codeql.yml` held `security-events: write` at the workflow level, where every
+  job inherits it. The permission now sits on the one job that uploads SARIF,
+  and the workflow level grants read only. Found by OpenSSF Scorecard.
+
 ## [0.2.0]
 
 The gate did not gate. An independent review, cross-checked against a second
@@ -136,6 +171,7 @@ before the first tag. Each has a regression test in `tests/test_gate.sh`.
 - Only Claude Code exposes an end-of-turn hook that can block a turn. Other
   agents can run the gate, but not be stopped by it.
 
-[Unreleased]: https://github.com/Why-Next/prove-it/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Why-Next/prove-it/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Why-Next/prove-it/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Why-Next/prove-it/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Why-Next/prove-it/releases/tag/v0.1.0

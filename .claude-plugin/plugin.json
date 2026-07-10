@@ -1,7 +1,7 @@
 {
   "name": "prove-it",
   "description": "An agent cannot end its turn until the repo proves itself. Runs ./verify.sh at the repo root on Stop and blocks the turn when it fails. Opt-in: no verify.sh, no gate.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Why-Next",
     "email": "hello@whynext.app"

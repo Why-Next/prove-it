@@ -136,6 +136,12 @@ is the opt-out in section 2 and must keep working. Deleting it in the middle of
 the session that it was about to block is not an opt-out, and the difference
 between the two is only visible to an implementation that looked before.
 
+The subtler form keeps `verify.sh` executable and rewrites the checks inside it.
+That cannot be refused without also refusing legitimate work on the gate, so an
+implementation should record what `verify.sh` contained when the session began,
+and when a turn passes through a `verify.sh` that changed during the session,
+say so where the user will see it. The pass stands; the silence does not.
+
 ## 5. Conformance levels
 
 Be precise about what a machine enforces and what a person practises. That
