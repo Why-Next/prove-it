@@ -2,6 +2,7 @@
 
 [![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Why-Next/prove-it/badge)](https://scorecard.dev/viewer/?uri=github.com/Why-Next/prove-it)
+[![OpenSSF best practices](https://www.bestpractices.dev/projects/13555/badge)](https://www.bestpractices.dev/projects/13555)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
