@@ -51,6 +51,36 @@ deja el `git diff --check` generado como la única comprobación activa, y activ
 real solo después de haberlo visto pasar a mano. Desde entonces, cuando el agente cambia el
 repositorio e intenta parar, `verify.sh` decide si puede devolverte el trabajo.
 
+## ¿Por qué no cinco líneas propias?
+
+Un Stop hook que ejecuta tus pruebas son cinco líneas de bash, es la primera versión de casi
+todo el mundo, y falla de cuatro maneras silenciosas. Varias de ellas fueron errores en
+versiones tempranas de esta misma barrera, y por eso cada una tiene ahora una prueba de
+regresión.
+
+- **Devuelve el turno una vez, y nunca más.** Claude Code establece `stop_hook_active` en
+  cada parada posterior al primer bloqueo. Un hook que lee esa marca como "déjalo pasar"
+  bloquea exactamente una vez y después deja de ser una barrera, y uno que ignora la marca
+  bloquea para siempre y cuelga la sesión. Esta barrera cuenta los intentos, devuelve el
+  turno un número acotado de veces y luego cede en voz alta.
+- **Una confirmación se ve como si no hubiera pasado nada.** Un hook que decide comprobando
+  si el árbol de trabajo está sucio deja pasar cualquier turno que termine en una
+  confirmación, y confirmar es lo más corriente que hace un agente. Esta barrera compara el
+  árbol contra una línea base anotada al inicio de la sesión, así que una confirmación, una
+  reescritura con `sed` y un archivo generado cuentan todos como cambios.
+- **El agente puede quitar la comprobación.** Un agente que no consigue que `verify.sh` pase
+  puede, en su lugar, borrarlo o quitarle el bit de ejecución con `chmod -x`. Esta barrera
+  anota si el repositorio estaba armado cuando la sesión empezó y rechaza un turno que
+  termina con la barrera desarmada. Una reescritura que lo mantiene ejecutable se deja
+  pasar, y se te informa de ella en vez de confiar en ella en silencio.
+- **Rendirse es indistinguible de pasar.** Todo anfitrión acaba por forzar a un hook a
+  ceder. Un hook escrito a mano cede en silencio y la última palabra que ves es "hecho"; la
+  última palabra de este es una advertencia de que el turno terminó sin verificar.
+
+Si prefieres quedarte con tu propio hook, quédatelo, y lee [SPEC.md](../../SPEC.md) para
+conocer los casos que tiene que cubrir. La convención importa más que esta implementación
+de ella.
+
 ## Instalación
 
 Tres líneas, y la tercera hace el trabajo:
@@ -88,6 +118,10 @@ Fusiona [`hooks/settings.example.json`](../../hooks/settings.example.json) en tu
 `.claude/settings.json` para un solo repositorio, o `~/.claude/settings.json` para todos.
 La barrera lee una carga JSON del Stop hook por stdin y responde con un código de salida,
 así que cualquier cosa que pueda ejecutar un script al final del turno puede manejarla.
+Claude Code es donde se prueba; [docs/ADAPTERS.md](../ADAPTERS.md) tiene el cableado para
+Codex CLI, Qwen Code, Gemini CLI y Copilot CLI, que exponen el mismo tipo de hook bloqueante
+de fin de turno, y dice con claridad qué anfitriones no pueden manejar una barrera en
+absoluto.
 
 `prove-it doctor` responde si la barrera se dispararía en el repositorio en el que te
 encuentras, y te dice qué la está frenando si no lo haría:
@@ -151,11 +185,12 @@ con él borrado o con su bit de ejecución quitado queda bloqueada, se le dice q
 dice cómo renunciar con honestidad si eso era lo que pretendía. Borrar `verify.sh` entre
 sesiones sigue siendo una renuncia y sigue costando un solo comando.
 
-Lo que queda sin imponer es la versión sutil: un agente que mantiene `verify.sh` ejecutable y
-vacía en silencio las comprobaciones que hay dentro. El mensaje de fallo le dice que no lo
-haga, y [SPEC.md](../../SPEC.md) lo llama una violación en vez de una corrección, pero
-ninguna de esas dos cosas es una imposición. Lee tus diffs. Para eso está la evidencia del
-diff en la especificación.
+La versión sutil es un agente que mantiene `verify.sh` ejecutable y reescribe las
+comprobaciones que hay dentro. Ese pase no se bloquea, porque editar `verify.sh` es a menudo
+exactamente el trabajo que pediste, pero tampoco ocurre ya en silencio: cuando un turno pasa
+a través de un `verify.sh` que cambió durante la sesión, la barrera te lo dice, y el diff de
+`verify.sh` te dice si el cambio fue trabajo o evasión. Lee ese diff. Para eso está la
+evidencia del diff en la especificación.
 
 ## La convención de `verify.sh`
 

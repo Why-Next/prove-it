@@ -1,0 +1,34 @@
+name: Question
+description: Ask about installation, behavior, or whether prove-it fits your repository.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions are welcome when the answer should become part of the public project history.
+        If you are asking whether a behavior is a bug, use the bug report template instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to understand or decide?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Repository type, install method, and the `verify.sh` shape if relevant.
+    validations:
+      required: false
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Commands, docs, or examples you already checked.
+      render: shell
+    validations:
+      required: false

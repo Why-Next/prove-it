@@ -23,7 +23,10 @@ try to protect against.
 
 ## General questions
 
-Use GitHub issues only when the answer should become part of the public project
-history. Installation help without a reproduction may be closed and redirected
-to the README, because the project needs to keep maintainer time for issues that
-can change the code or the docs.
+Use GitHub Discussions for open-ended questions and ideas. Use GitHub issues
+only when the answer should become part of the public project history or when
+the report can change the code or the docs.
+
+Installation help without a reproduction may be redirected to the README or
+Discussions, because issue triage needs to stay focused on problems that can be
+reproduced.

@@ -73,6 +73,11 @@ each check delivers.
 Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`). Say in the body what
 changed and why. If you fixed a bug, say how you reproduced it.
 
+Use Signed-off-by trailers for commits when you can. By contributing, you
+certify that you have the right to submit the work under this project's license,
+following the Developer Certificate of Origin model. GitHub web commits require
+signoff in this repository.
+
 ## Releases
 
 Maintainers follow [RELEASE.md](RELEASE.md). A release needs a clean local

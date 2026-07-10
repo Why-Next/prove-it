@@ -1,6 +1,7 @@
 # prove-it
 
 [![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Why-Next/prove-it/badge)](https://scorecard.dev/viewer/?uri=github.com/Why-Next/prove-it)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -54,6 +55,37 @@ then turn on one real command after you have watched it pass by hand. From then
 on, when the agent changes the repository and tries to stop, `verify.sh` decides
 whether it may hand the work back.
 
+## Why not five lines of your own?
+
+A Stop hook that runs your tests is five lines of bash, it is most people's
+first version, and it fails in four quiet ways. Several of them were bugs in
+early versions of this very gate, which is why each now has a regression test.
+
+- **It pushes back once, then never again.** Claude Code sets
+  `stop_hook_active` on every stop after the first block. A hook that reads
+  that flag as "let it through" blocks exactly once and then stops being a
+  gate, and one that ignores the flag blocks forever and hangs the session.
+  This gate counts attempts, pushes back a bounded number of times, and then
+  yields loudly.
+- **A commit looks like nothing happened.** A hook that decides by checking
+  whether the working tree is dirty waves through any turn that ends in a
+  commit, and committing is the most ordinary thing an agent does. This gate
+  compares the tree against a baseline recorded at session start, so a commit,
+  a `sed` rewrite, and a generated file all count as changes.
+- **The agent can remove the check.** An agent that cannot pass `verify.sh`
+  can delete it or `chmod -x` it instead. This gate records whether the
+  repository was armed when the session began and refuses a turn that ends
+  with the gate disarmed. A rewrite that keeps it executable is allowed
+  through, and reported to you rather than silently trusted.
+- **Giving up is indistinguishable from passing.** Every host eventually
+  forces a hook to yield. A hand-rolled hook yields in silence and the last
+  word you see is "done"; this one's last word is a warning that the turn
+  ended unverified.
+
+If you would rather keep your own hook, keep it, and read [SPEC.md](SPEC.md)
+for the cases it has to cover. The convention matters more than this
+implementation of it.
+
 ## Install
 
 Three lines, and the third one does the work:
@@ -92,6 +124,10 @@ Merge [`hooks/settings.example.json`](hooks/settings.example.json) into your
 `.claude/settings.json` for one repository, or `~/.claude/settings.json` for all
 of them. The gate reads a Stop-hook JSON payload on stdin and answers with an
 exit code, so anything that can run a script at end of turn can drive it.
+Claude Code is where it is tested; [docs/ADAPTERS.md](docs/ADAPTERS.md) has the
+wiring for Codex CLI, Qwen Code, Gemini CLI, and Copilot CLI, which expose the
+same kind of blocking end-of-turn hook, and says plainly which hosts cannot
+drive a gate at all.
 
 `prove-it doctor` answers whether the gate would fire in the repository you are
 standing in, and tells you what is stopping it if it would not:
@@ -157,11 +193,12 @@ blocked, told what it did, and told how to opt out honestly if that is what it
 meant. Deleting `verify.sh` between sessions is still an opt-out and still takes
 one command.
 
-What remains unenforced is the subtle version: an agent that keeps `verify.sh`
-executable and quietly guts the checks inside it. The failure message tells it
-not to, and [SPEC.md](SPEC.md) calls that a violation rather than a fix, but
-neither of those is enforcement. Read your diffs. That is what the diff evidence
-in the spec is for.
+The subtle version is an agent that keeps `verify.sh` executable and rewrites
+the checks inside it. That pass is not blocked, because editing `verify.sh` is
+often exactly the work you asked for, but it is no longer quiet either: when a
+turn passes through a `verify.sh` that changed during the session, the gate
+tells you so, and the diff to `verify.sh` tells you whether the change was work
+or evasion. Read that diff. That is what the diff evidence in the spec is for.
 
 ## The `verify.sh` convention
 
@@ -248,6 +285,12 @@ Read [SECURITY.md](SECURITY.md) before using this in repositories you do not
 trust. `prove-it` executes the repository-owned `verify.sh`; it is a guardrail,
 not a sandbox.
 
+The security boundary is written down in
+[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md), release verification steps
+are in [docs/RELEASE_VERIFICATION.md](docs/RELEASE_VERIFICATION.md), and the
+open-source operating checklist is in
+[docs/OPEN_SOURCE_READINESS.md](docs/OPEN_SOURCE_READINESS.md).
+
 Release steps live in [RELEASE.md](RELEASE.md), including the checklist for
 verification, workflow status, checksums, and provenance attestation. Support
 boundaries live in [SUPPORT.md](SUPPORT.md).
@@ -256,7 +299,9 @@ boundaries live in [SUPPORT.md](SUPPORT.md).
 
 Issues and pull requests are welcome. Changes to the convention belong in an
 issue rather than a pull request against the reference implementation. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). Governance, maintainer responsibilities,
+and roadmap direction live in [GOVERNANCE.md](GOVERNANCE.md),
+[MAINTAINERS.md](MAINTAINERS.md), and [ROADMAP.md](ROADMAP.md).
 
 ## License
 

@@ -146,6 +146,13 @@ ou désarmé. Supprimer le fichier entre les sessions est le retrait de la secti
 était sur le point de bloquer n'est pas un retrait, et la différence entre les
 deux n'est visible que pour une implémentation qui a regardé avant.
 
+La forme plus subtile garde `verify.sh` exécutable et réécrit les vérifications
+qu'il contient. Cela ne peut pas être refusé sans refuser aussi le travail
+légitime sur la barrière, donc une implémentation devrait enregistrer ce que
+`verify.sh` contenait au début de la session, et quand un tour passe à travers
+un `verify.sh` qui a changé pendant la session, le dire là où l'utilisateur le
+verra. Le passage tient ; le silence, non.
+
 ## 5. Les niveaux de conformité
 
 Soyez précis sur ce qu'une machine impose et ce qu'une personne pratique. Cette

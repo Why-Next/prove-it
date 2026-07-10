@@ -76,6 +76,10 @@ Email **hello@whynext.app** with the details and a reproduction. Please do not
 open a public issue for anything that lets a repository escape the boundaries
 described above.
 
+GitHub private vulnerability reporting is enabled for this repository. If you
+prefer that flow, use GitHub's private advisory form from the repository
+Security tab.
+
 Expect an acknowledgement within a few days. One person maintains this, so
 patience helps, and so does the reproduction. A report I cannot reproduce is one
 I cannot fix.

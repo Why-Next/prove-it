@@ -57,6 +57,41 @@ active, puis activez une vraie commande seulement après l'avoir vue passer à l
 main. Ensuite, quand l'agent modifie le dépôt et tente de s'arrêter,
 `verify.sh` décide s'il peut rendre le travail.
 
+## Pourquoi pas cinq lignes de votre cru ?
+
+Un Stop hook qui lance vos tests tient en cinq lignes de bash, c'est la première
+version que presque tout le monde écrit, et il échoue de quatre façons
+silencieuses. Plusieurs d'entre elles étaient des bugs dans les premières
+versions de cette barrière même, et c'est pourquoi chacune a désormais son test
+de régression.
+
+- **Il repousse une fois, puis plus jamais.** Claude Code définit
+  `stop_hook_active` à chaque arrêt après le premier blocage. Un hook qui lit ce
+  drapeau comme "laisse passer" bloque exactement une fois puis cesse d'être une
+  barrière, et un hook qui ignore le drapeau bloque pour toujours et fait se
+  figer la session. Cette barrière compte les tentatives, repousse un nombre
+  borné de fois, puis cède bruyamment.
+- **Un commit ressemble à une absence de changement.** Un hook qui décide en
+  regardant si l'arbre de travail est sale laisse passer tout tour qui se
+  termine par un commit, et committer est la chose la plus ordinaire qu'un agent
+  fasse. Cette barrière compare l'arbre à une référence enregistrée au début de
+  la session, donc un commit, une réécriture par `sed` et un fichier généré
+  comptent tous comme des changements.
+- **L'agent peut retirer la vérification.** Un agent qui n'arrive pas à faire
+  passer `verify.sh` peut le supprimer ou lui appliquer `chmod -x` à la place.
+  Cette barrière enregistre si le dépôt était armé au début de la session et
+  refuse un tour qui se termine avec la barrière désarmée. Une réécriture qui le
+  garde exécutable est laissée passer, et vous est signalée plutôt que d'être
+  crue en silence.
+- **Abandonner est indiscernable de passer.** Tout hôte finit par forcer un hook
+  à céder. Un hook écrit à la main cède en silence et le dernier mot que vous
+  voyez est "terminé" ; le dernier mot de celui-ci est un avertissement disant
+  que le tour s'est terminé sans vérification.
+
+Si vous préférez garder votre propre hook, gardez-le, et lisez
+[SPEC.md](../../SPEC.md) pour les cas qu'il doit couvrir. La convention compte
+plus que cette implémentation-ci.
+
 ## Installation
 
 Trois lignes, et c'est la troisième qui fait le travail :
@@ -98,7 +133,11 @@ Fusionnez [`hooks/settings.example.json`](../../hooks/settings.example.json) dan
 votre `.claude/settings.json` pour un seul dépôt, ou `~/.claude/settings.json`
 pour tous. La barrière lit une charge JSON de Stop hook sur stdin et répond par
 un code de sortie, donc tout ce qui peut lancer un script en fin de tour peut la
-piloter.
+piloter. Claude Code est là où elle est testée ;
+[docs/ADAPTERS.md](../ADAPTERS.md) contient le branchement pour Codex CLI, Qwen
+Code, Gemini CLI et Copilot CLI, qui exposent le même genre de hook bloquant de
+fin de tour, et dit clairement quels hôtes ne peuvent pas piloter de barrière du
+tout.
 
 `prove-it doctor` répond à la question de savoir si la barrière se déclencherait
 dans le dépôt où vous vous trouvez, et vous dit ce qui l'en empêche si ce n'est
@@ -172,12 +211,13 @@ fait, et informée de comment se retirer honnêtement si c'était bien son
 intention. Supprimer `verify.sh` entre les sessions reste un retrait et ne
 demande toujours qu'une seule commande.
 
-Ce qui reste sans contrainte technique, c'est la version subtile : un agent qui
-garde `verify.sh` exécutable et vide silencieusement les vérifications qu'il
-contient. Le message d'échec lui dit de ne pas le faire, et
-[SPEC.md](../../SPEC.md) qualifie cela de violation plutôt que de correctif, mais
-aucun des deux n'est une contrainte technique. Lisez vos diffs. C'est à cela que
-sert la preuve par le diff dans la spec.
+La version subtile, c'est un agent qui garde `verify.sh` exécutable et réécrit
+les vérifications qu'il contient. Ce passage n'est pas bloqué, parce que
+modifier `verify.sh` est souvent exactement le travail que vous avez demandé,
+mais il n'est plus silencieux non plus : quand un tour passe à travers un
+`verify.sh` qui a changé pendant la session, la barrière vous le dit, et le diff
+de `verify.sh` vous dit si le changement était du travail ou une esquive. Lisez
+ce diff. C'est à cela que sert la preuve par le diff dans la spec.
 
 ## La convention `verify.sh`
 

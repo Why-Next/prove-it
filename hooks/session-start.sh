@@ -48,6 +48,15 @@ BASELINE="$STATE_DIR/baseline-${SESSION_ID}-${REPO_KEY}"
 GUARD="$STATE_DIR/guard-${SESSION_ID}-${REPO_KEY}"
 [ -f "$GUARD" ] || pi_verify_state "$ROOT" > "$GUARD" 2>/dev/null
 
+# What the gate itself said at session start, so the Stop hook can tell the
+# user when a pass went through a verify.sh that was rewritten mid-session.
+# Recorded only for a gate that was armed: a verify.sh created during the
+# session has no earlier self to differ from.
+GATEHASH="$STATE_DIR/gatehash-${SESSION_ID}-${REPO_KEY}"
+if [ ! -f "$GATEHASH" ] && [ -x "$ROOT/verify.sh" ]; then
+    pi_gate_hash "$ROOT" > "$GATEHASH" 2>/dev/null
+fi
+
 # The state above is the point of this hook. The notice below is a courtesy, and
 # silencing the courtesy must not silence the gate.
 [ "${PROVE_IT_QUIET:-}" = "1" ] && exit 0

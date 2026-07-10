@@ -61,6 +61,7 @@ GUARD="$STATE_DIR/guard-${SESSION_ID}-${REPO_KEY}"
 MARKER="$STATE_DIR/wrote-${SESSION_ID}-${REPO_KEY}"
 STAMP="$STATE_DIR/stamp-${REPO_KEY}"
 ATTEMPTS="$STATE_DIR/attempts-${SESSION_ID}-${REPO_KEY}"
+GATEHASH="$STATE_DIR/gatehash-${SESSION_ID}-${REPO_KEY}"
 
 # Is there a gate here at all? This is asked first because it is the cheapest
 # question and, in most repositories, the answer is no. Hashing the tree of a
@@ -113,6 +114,24 @@ else
     if [ "$RC" -eq 0 ]; then
         printf '%s' "$STATE" > "$STAMP" 2>/dev/null
         rm -f "$ATTEMPTS" 2>/dev/null
+        # A pass through a gate rewritten mid-session is a pass through the new
+        # gate, not the one the session started with. Editing verify.sh is often
+        # the requested work, so this is not a block. But whether the edit
+        # weakened the gate is the user's call, and they can only make it about
+        # an edit they were told happened.
+        if [ -f "$GATEHASH" ] \
+            && [ "$(cat "$GATEHASH" 2>/dev/null)" != "$(pi_gate_hash "$ROOT")" ]; then
+            python3 2>/dev/null <<'PY' || true
+import json
+
+print(json.dumps({
+    "systemMessage": (
+        "prove-it: verify.sh passed, but verify.sh itself was modified during "
+        "this session. Review the diff to verify.sh before trusting the pass."
+    )
+}))
+PY
+        fi
         exit 0
     fi
 fi

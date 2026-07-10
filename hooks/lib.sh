@@ -112,6 +112,13 @@ pi_verify_state() {
     if [ -x "$1/verify.sh" ]; then printf 'armed'; else printf 'unarmed'; fi
 }
 
+# Content hash of the gate itself. The disarm check catches a verify.sh that
+# was deleted or chmod -x'd mid-session; this catches the subtler move of
+# keeping it executable and rewriting the checks inside it.
+pi_gate_hash() {
+    cksum < "$1/verify.sh" 2>/dev/null | tr -s ' ' '-'
+}
+
 # How many times the gate may block one stretch of work before it gives up and
 # says so. Zero means never block, which is a warning-only mode.
 pi_max_blocks() {

@@ -1,0 +1,41 @@
+name: Hardening proposal
+description: Propose a security, release, or supply-chain hardening change.
+labels: ["hardening"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for changes to hook behavior, workflow permissions, release artifacts,
+        provenance, security documentation, or repository policy.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk being reduced
+      description: What can go wrong today, and how does this reduce it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Link to a failed check, security guidance, reproduction, or comparable project behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Who might be surprised by this change?
+    validations:
+      required: false

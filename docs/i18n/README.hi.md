@@ -33,6 +33,17 @@ gate एक turn में तीन बार तक वापस धकेल�
 
 पहले दिन का flow जानबूझकर छोटा है। Plugin install करें, `/prove-it:init` चलाएँ, generated `git diff --check` को ही active check रहने दें, फिर एक real command को हाथ से pass होते देखने के बाद चालू करें। इसके बाद agent repository बदलकर रुकना चाहे, तो `verify.sh` तय करता है कि वह काम वापस दे सकता है या नहीं।
 
+## अपनी खुद की पाँच lines क्यों नहीं?
+
+एक Stop hook जो आपके tests चलाता है, bash की पाँच lines है, ज़्यादातर लोगों का पहला version यही होता है, और यह चार चुपचाप तरीकों से fail होता है। इनमें से कई इसी gate के शुरुआती versions में bugs थे, इसीलिए अब हर एक के लिए एक regression test है।
+
+- **यह एक बार वापस धकेलता है, फिर कभी नहीं।** Claude Code पहले block के बाद हर stop पर `stop_hook_active` सेट कर देता है। जो hook उस flag को "जाने दो" के रूप में पढ़ता है वह ठीक एक बार block करता है और फिर gate रहना बंद कर देता है, और जो उस flag को नज़रअंदाज़ करता है वह हमेशा block करता रहता है और session को अटका देता है। यह gate प्रयासों को गिनता है, एक सीमित संख्या में बार वापस धकेलता है, और फिर ज़ोर से हार मान लेता है।
+- **एक commit ऐसा दिखता है जैसे कुछ हुआ ही नहीं।** जो hook यह देखकर फैसला करता है कि working tree गंदी है या नहीं, वह हर उस turn को गुज़र जाने देता है जो commit पर समाप्त होती है, और commit करना agent का सबसे साधारण काम है। यह gate tree की तुलना session की शुरुआत में दर्ज baseline से करता है, इसलिए एक commit, `sed` से किया गया rewrite, और एक generated file - ये सब बदलाव गिने जाते हैं।
+- **agent check को ही हटा सकता है।** जो agent `verify.sh` को pass नहीं करा पाता, वह इसके बजाय उसे delete या `chmod -x` कर सकता है। यह gate दर्ज कर लेता है कि session शुरू होते समय repository armed थी या नहीं, और ऐसी turn को अस्वीकार कर देता है जो gate के निहत्थे रहते समाप्त होती है। ऐसा rewrite जो उसे executable बनाए रखता है, गुज़रने दिया जाता है, और उस पर चुपचाप भरोसा करने के बजाय आपको उसकी रिपोर्ट दी जाती है।
+- **हार मानना pass होने से अलग नहीं पहचाना जा सकता।** हर host आखिरकार किसी hook को हार मानने पर मजबूर कर देता है। हाथ से लिखा hook चुपचाप हार मानता है और आखिरी शब्द जो आप देखते हैं वह "done" होता है; इस वाले का आखिरी शब्द एक चेतावनी है कि turn बिना verify हुए समाप्त हो गई।
+
+अगर आप अपना ही hook रखना पसंद करें, तो उसे रखें, और उन cases के लिए [SPEC.md](../../SPEC.md) पढ़ें जिन्हें उसे कवर करना ही होगा। convention उसके इस implementation से ज़्यादा मायने रखता है।
+
 ## इंस्टॉल
 
 तीन lines, और असल काम तीसरी करती है:
@@ -58,7 +69,7 @@ git clone https://github.com/Why-Next/prove-it ~/.local/share/prove-it
 ~/.local/share/prove-it/bin/prove-it init
 ```
 
-[`hooks/settings.example.json`](../../hooks/settings.example.json) को एक repository के लिए अपने `.claude/settings.json` में, या उन सबके लिए `~/.claude/settings.json` में merge करें। gate stdin पर एक Stop hook JSON payload पढ़ता है और एक exit code से जवाब देता है, इसलिए कोई भी चीज़ जो turn के अंत में script चला सके, उसे चला सकती है।
+[`hooks/settings.example.json`](../../hooks/settings.example.json) को एक repository के लिए अपने `.claude/settings.json` में, या उन सबके लिए `~/.claude/settings.json` में merge करें। gate stdin पर एक Stop hook JSON payload पढ़ता है और एक exit code से जवाब देता है, इसलिए कोई भी चीज़ जो turn के अंत में script चला सके, उसे चला सकती है। Claude Code वह जगह है जहाँ इसे test किया जाता है; [docs/ADAPTERS.md](../ADAPTERS.md) में Codex CLI, Qwen Code, Gemini CLI, और Copilot CLI के लिए wiring है, जो इसी तरह का blocking end-of-turn hook उपलब्ध कराते हैं, और वह साफ-साफ बताता है कि कौन-से hosts किसी gate को बिल्कुल भी नहीं चला सकते।
 
 `prove-it doctor` यह जवाब देता है कि जिस repository में आप खड़े हैं उसमें gate चलेगा या नहीं, और अगर नहीं चलेगा तो बताता है कि उसे क्या रोक रहा है:
 
@@ -99,7 +110,7 @@ gate तब तक चुप रहता है जब तक ये सब स
 
 इसका सबसे सस्ता रूप gate को सीधे निहत्था कर देना है, इसलिए gate इसे अस्वीकार कर देता है। hook दर्ज कर लेता है कि session शुरू होते समय `verify.sh` executable था या नहीं, और जो session उसे delete किए हुए या उसका executable bit हटाए हुए समाप्त होती है उसे block किया जाता है, बताया जाता है कि उसने क्या किया, और बताया जाता है कि अगर उसका यही इरादा था तो ईमानदारी से बाहर कैसे निकला जाए। sessions के बीच `verify.sh` को delete करना अब भी एक opt-out है और अब भी एक ही command लेता है।
 
-जो चीज़ अप्रवर्तित रहती है वह है सूक्ष्म रूप: एक ऐसा agent जो `verify.sh` को executable बनाए रखता है और चुपचाप उसके भीतर के checks को खोखला कर देता है। failure संदेश उसे ऐसा न करने को कहता है, और [SPEC.md](../../SPEC.md) इसे fix नहीं बल्कि एक उल्लंघन कहती है, लेकिन इनमें से कोई भी प्रवर्तन नहीं है। अपने diffs पढ़ें। spec में diff साक्ष्य इसी के लिए है।
+सूक्ष्म रूप वह agent है जो `verify.sh` को executable बनाए रखता है और उसके भीतर के checks को दोबारा लिख देता है। उस pass को block नहीं किया जाता, क्योंकि `verify.sh` को edit करना अक्सर ठीक वही काम होता है जो आपने माँगा था, लेकिन अब यह चुपचाप भी नहीं रहता: जब कोई turn ऐसे `verify.sh` से होकर pass होती है जो session के दौरान बदला, तो gate आपको यह बता देता है, और `verify.sh` का diff आपको बताता है कि बदलाव काम था या बचने की चाल। वह diff पढ़ें। spec में diff साक्ष्य इसी के लिए है।
 
 ## `verify.sh` कन्वेंशन
 

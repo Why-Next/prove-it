@@ -146,6 +146,13 @@ weiter funktionieren. Sie mitten in der Sitzung zu löschen, die sie gerade
 blockieren wollte, ist kein Ausstieg, und der Unterschied zwischen beidem ist nur
 für eine Implementierung sichtbar, die vorher hingeschaut hat.
 
+Die subtilere Form hält `verify.sh` ausführbar und schreibt die Checks darin um.
+Das lässt sich nicht verweigern, ohne auch legitime Arbeit am Gate zu verweigern,
+also sollte eine Implementierung festhalten, was `verify.sh` beim Beginn der
+Sitzung enthielt, und wenn ein Zug durch ein `verify.sh` kommt, das sich während
+der Sitzung geändert hat, das dort sagen, wo der Nutzer es sieht. Das Bestehen
+hat Bestand; das Schweigen nicht.
+
 ## 5. Konformitätsstufen
 
 Sei genau darin, was eine Maschine erzwingt und was ein Mensch praktiziert.
