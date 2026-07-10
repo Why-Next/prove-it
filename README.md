@@ -1,6 +1,7 @@
 # prove-it
 
 [![verify](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml/badge.svg)](https://github.com/Why-Next/prove-it/actions/workflows/verify.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Why-Next/prove-it/badge)](https://scorecard.dev/viewer/?uri=github.com/Why-Next/prove-it)
 [![spec 0.1](https://img.shields.io/badge/spec-0.1-4F6134)](SPEC.md)
 [![license MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 ![dependencies none](https://img.shields.io/badge/dependencies-none-4F6134)
@@ -248,6 +249,12 @@ Read [SECURITY.md](SECURITY.md) before using this in repositories you do not
 trust. `prove-it` executes the repository-owned `verify.sh`; it is a guardrail,
 not a sandbox.
 
+The security boundary is written down in
+[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md), release verification steps
+are in [docs/RELEASE_VERIFICATION.md](docs/RELEASE_VERIFICATION.md), and the
+open-source operating checklist is in
+[docs/OPEN_SOURCE_READINESS.md](docs/OPEN_SOURCE_READINESS.md).
+
 Release steps live in [RELEASE.md](RELEASE.md), including the checklist for
 verification, workflow status, checksums, and provenance attestation. Support
 boundaries live in [SUPPORT.md](SUPPORT.md).
@@ -256,7 +263,9 @@ boundaries live in [SUPPORT.md](SUPPORT.md).
 
 Issues and pull requests are welcome. Changes to the convention belong in an
 issue rather than a pull request against the reference implementation. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). Governance, maintainer responsibilities,
+and roadmap direction live in [GOVERNANCE.md](GOVERNANCE.md),
+[MAINTAINERS.md](MAINTAINERS.md), and [ROADMAP.md](ROADMAP.md).
 
 ## License
 

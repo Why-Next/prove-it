@@ -15,13 +15,21 @@ REQUIRED = [
     "SPEC.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
+    "GOVERNANCE.md",
+    "MAINTAINERS.md",
+    "ROADMAP.md",
     "CODE_OF_CONDUCT.md",
     "CHANGELOG.md",
     "RELEASE.md",
     "SUPPORT.md",
+    "docs/SECURITY_MODEL.md",
+    "docs/RELEASE_VERIFICATION.md",
+    "docs/OPEN_SOURCE_READINESS.md",
     ".github/CODEOWNERS",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/hardening.yml",
+    ".github/ISSUE_TEMPLATE/question.yml",
     ".github/ISSUE_TEMPLATE/spec_proposal.yml",
     ".github/dependabot.yml",
 ]
@@ -37,7 +45,18 @@ def main() -> int:
             errors.append(f"{rel} is empty")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for rel in ("SECURITY.md", "CONTRIBUTING.md", "RELEASE.md", "SUPPORT.md"):
+    for rel in (
+        "SECURITY.md",
+        "CONTRIBUTING.md",
+        "GOVERNANCE.md",
+        "MAINTAINERS.md",
+        "ROADMAP.md",
+        "RELEASE.md",
+        "SUPPORT.md",
+        "docs/SECURITY_MODEL.md",
+        "docs/RELEASE_VERIFICATION.md",
+        "docs/OPEN_SOURCE_READINESS.md",
+    ):
         if f"]({rel})" not in readme and f"`{rel}`" not in readme:
             errors.append(f"README.md does not point to {rel}")
 

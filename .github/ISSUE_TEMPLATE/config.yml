@@ -6,3 +6,6 @@ contact_links:
   - name: A recipe for a stack we do not cover
     url: https://github.com/Why-Next/prove-it/tree/main/recipes
     about: Open a pull request against recipes/ directly. No issue needed.
+  - name: Discussion
+    url: https://github.com/Why-Next/prove-it/discussions
+    about: Use Discussions for open-ended ideas that are not yet actionable issues.

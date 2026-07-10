@@ -11,14 +11,16 @@ on:
         required: true
 
 permissions:
-  attestations: write
   contents: read
-  id-token: write
 
 jobs:
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -53,6 +55,16 @@ jobs:
             -o "dist/prove-it-${tag}.tar.gz" "$tag"
           shasum -a 256 "dist/prove-it-${tag}.tar.gz" \
             > "dist/prove-it-${tag}.tar.gz.sha256"
+          {
+            printf '# prove-it %s\n\n' "$tag"
+            printf 'This release was built from the annotated tag `%s`.\n\n' "$tag"
+            printf 'Assets:\n'
+            printf '- `prove-it-%s.tar.gz`\n' "$tag"
+            printf '- `prove-it-%s.tar.gz.sha256`\n\n' "$tag"
+            printf 'Verification:\n'
+            printf '- `shasum -a 256 -c prove-it-%s.tar.gz.sha256`\n' "$tag"
+            printf '- `gh attestation verify prove-it-%s.tar.gz -R Why-Next/prove-it`\n' "$tag"
+          } > "dist/RELEASE_NOTES.md"
 
       - name: Attest source package
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -64,3 +76,20 @@ jobs:
         with:
           name: "prove-it-${{ steps.ref.outputs.tag }}"
           path: dist/*
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag="${{ steps.ref.outputs.tag }}"
+          archive="dist/prove-it-${tag}.tar.gz"
+          checksum="dist/prove-it-${tag}.tar.gz.sha256"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$archive" "$checksum" --clobber
+          else
+            gh release create "$tag" "$archive" "$checksum" \
+              --verify-tag \
+              --title "prove-it $tag" \
+              --notes-file "dist/RELEASE_NOTES.md"
+          fi

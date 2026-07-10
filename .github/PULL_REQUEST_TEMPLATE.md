@@ -27,3 +27,8 @@ paste the output here
 - [ ] There is an issue discussing this change, linked below.
 
 <!-- The convention is the artifact. The script is the footnote. -->
+
+## Contributor certification
+
+- [ ] I have the right to submit this work under the project license.
+- [ ] My commits are signed off, or I explain below why they are not.

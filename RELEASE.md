@@ -27,8 +27,11 @@ git push origin v0.2.0
 ```
 
 The `release` workflow packages the tag with `git archive`, writes a SHA-256
-checksum, and asks GitHub to create a provenance attestation for the archive.
-The generated artifact is the thing to attach to the GitHub release.
+checksum, asks GitHub to create a provenance attestation for the archive, and
+publishes the archive plus checksum to the GitHub release.
+
+Users can verify a release with the commands in
+[`docs/RELEASE_VERIFICATION.md`](docs/RELEASE_VERIFICATION.md).
 
 ## Release notes
 
