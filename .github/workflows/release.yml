@@ -59,11 +59,13 @@ jobs:
             printf '# prove-it %s\n\n' "$tag"
             printf 'This release was built from the annotated tag `%s`.\n\n' "$tag"
             printf 'Assets:\n'
-            printf '- `prove-it-%s.tar.gz`\n' "$tag"
-            printf '- `prove-it-%s.tar.gz.sha256`\n\n' "$tag"
+            # printf --: a format string that starts with '-' reads as an
+            # option and killed the first three release runs of this workflow.
+            printf -- '- `prove-it-%s.tar.gz`\n' "$tag"
+            printf -- '- `prove-it-%s.tar.gz.sha256`\n\n' "$tag"
             printf 'Verification:\n'
-            printf '- `shasum -a 256 -c prove-it-%s.tar.gz.sha256`\n' "$tag"
-            printf '- `gh attestation verify prove-it-%s.tar.gz -R Why-Next/prove-it`\n' "$tag"
+            printf -- '- `shasum -a 256 -c prove-it-%s.tar.gz.sha256`\n' "$tag"
+            printf -- '- `gh attestation verify prove-it-%s.tar.gz -R Why-Next/prove-it`\n' "$tag"
           } > "dist/RELEASE_NOTES.md"
 
       - name: Attest source package
